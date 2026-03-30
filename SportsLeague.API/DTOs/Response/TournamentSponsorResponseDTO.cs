@@ -1,4 +1,5 @@
-﻿namespace SportsLeague.API.DTOs.Response;
+﻿
+namespace SportsLeague.API.DTOs.Response;
 
 public class TournamentSponsorResponseDTO
 {

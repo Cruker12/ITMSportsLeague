@@ -5,8 +5,7 @@ using SportsLeague.Domain.Interfaces.Repositories;
 
 namespace SportsLeague.DataAccess.Repositories;
 
-public class TournamentSponsorRepository
-    : GenericRepository<TournamentSponsor>, ITournamentSponsorRepository
+public class TournamentSponsorRepository : GenericRepository<TournamentSponsor>, ITournamentSponsorRepository
 {
     public TournamentSponsorRepository(LeagueDbContext context) : base(context) { }
 
@@ -15,6 +14,7 @@ public class TournamentSponsorRepository
         return await _dbSet
             .Where(ts => ts.TournamentId == tournamentId)
             .Include(ts => ts.Sponsor)
+            .Include(ts => ts.Tournament)
             .ToListAsync();
     }
 
@@ -23,6 +23,7 @@ public class TournamentSponsorRepository
         return await _dbSet
             .Where(ts => ts.SponsorId == sponsorId)
             .Include(ts => ts.Tournament)
+            .Include(ts => ts.Sponsor)
             .ToListAsync();
     }
 

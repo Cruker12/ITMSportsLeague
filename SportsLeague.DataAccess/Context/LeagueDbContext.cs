@@ -232,6 +232,7 @@ public class LeagueDbContext : DbContext
                   .IsRequired();
             entity.Property(m => m.UpdatedAt)
                   .IsRequired(false);
+
             // Relación con Tournament (Cascade: eliminar torneo elimina partidos)
             entity.HasOne(m => m.Tournament)
                   .WithMany(t => t.Matches)

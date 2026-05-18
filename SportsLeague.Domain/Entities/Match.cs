@@ -19,11 +19,14 @@ public class Match : AuditBase
     public Team AwayTeam { get; set; } = null!;
     public Referee Referee { get; set; } = null!;
 
-    // Relación 1:1 con resultado
+    // Relación 1:1 con resultado (relation 1:1 with result)
     public MatchResult? MatchResult { get; set; }
 
-    // Relación 1:N con goles y tarjetas
+    // Relación 1:N con goles y tarjetas (relation 1:N with goals and cards)
     public ICollection<Goal> Goals { get; set; } = new List<Goal>();
     public ICollection<Card> Cards { get; set; } = new List<Card>();
+
+    // Relación 1:N con alineaciones ( relation 1:N with lineups)
+    public ICollection<MatchLineup> Lineups { get; set; } = new List<MatchLineup>();
 
 }

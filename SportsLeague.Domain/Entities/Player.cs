@@ -18,4 +18,6 @@ public class Player : AuditBase
     public ICollection<Goal> Goals { get; set; } = new List<Goal>();
     public ICollection<Card> Cards { get; set; } = new List<Card>();
 
+    // Relación 1:N con alineaciones ( relation 1:N with lineups)
+    public ICollection<MatchLineup> Lineups { get; set; } = new List<MatchLineup>();
 }

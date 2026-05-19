@@ -1,7 +1,7 @@
-﻿using SportsLeague.DataAccess.Context;
+﻿using Microsoft.EntityFrameworkCore;
+using SportsLeague.DataAccess.Context;
 using SportsLeague.Domain.Entities;
 using SportsLeague.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
 
 namespace SportsLeague.DataAccess.Seeders;
 
@@ -237,5 +237,19 @@ public static class DataSeeder
             });
         }
         await context.SaveChangesAsync();
+
+        // ═══ 6. PARTIDO DE PRUEBA ═══
+        var match = new Match
+        {
+            HomeTeamId = teams[0].Id,   // Atlético Nacional
+            AwayTeamId = teams[1].Id,   // Independiente Medellín
+            TournamentId = tournament.Id,
+            RefereeId = referees[0].Id,
+            MatchDate = new DateTime(2026, 2, 1, 15, 0, 0),
+            Status = MatchStatus.Scheduled
+        };
+        context.Matches.Add(match);
+        await context.SaveChangesAsync();
     }
+
 }

@@ -1,4 +1,8 @@
-# 🏆 Sports League API
+<div align="center">
+
+# 🏆 Sports League API · Gestión de Ligas Deportivas
+
+</div>
 
 <div align="center">
 
@@ -339,6 +343,8 @@ https://localhost:{puerto}/swagger
 
 ## 📊 Estado del Proyecto
 
+<div align="center">
+
 | Módulo | Estado |
 |--------|--------|
 | Teams, Players, Referees | ✅ Completo |
@@ -348,6 +354,9 @@ https://localhost:{puerto}/swagger
 | Standings y Estadísticas | ✅ Completo |
 | Data Seeder | ✅ Completo |
 | Match Lineup (Alineaciones) | 🚧 En desarrollo |
+
+</div>
+
 
 
 

@@ -20,6 +20,28 @@ public class MatchRepository : GenericRepository<Match>, IMatchRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<Match>> GetByTournamentPagedAsync(
+        int tournamentId, int page, int pageSize)
+    {
+        return await _dbSet
+            .Where(m => m.TournamentId == tournamentId)
+            .Include(m => m.Tournament)
+            .Include(m => m.HomeTeam)
+            .Include(m => m.AwayTeam)
+            .Include(m => m.Referee)
+            .OrderBy(m => m.Matchday)
+            .ThenBy(m => m.MatchDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetCountByTournamentAsync(int tournamentId)
+    {
+        return await _dbSet
+            .CountAsync(m => m.TournamentId == tournamentId);
+    }
+
     public async Task<IEnumerable<Match>> GetByTeamAsync(int teamId)
     {
         return await _dbSet

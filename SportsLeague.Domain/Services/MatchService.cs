@@ -31,14 +31,24 @@ public class MatchService : IMatchService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<Match>> GetAllByTournamentAsync(int tournamentId)
+    public async Task<IEnumerable<Match>> GetAllByTournamentAsync(
+        int tournamentId, int? page = null, int? pageSize = null)
     {
         var tournament = await _tournamentRepository.GetByIdAsync(tournamentId);
         if (tournament == null)
             throw new KeyNotFoundException(
                 $"No se encontró el torneo con ID {tournamentId}");
 
+        if (page.HasValue && pageSize.HasValue)
+            return await _matchRepository
+                .GetByTournamentPagedAsync(tournamentId, page.Value, pageSize.Value);
+
         return await _matchRepository.GetByTournamentWithDetailsAsync(tournamentId);
+    }
+
+    public async Task<int> GetCountByTournamentAsync(int tournamentId)
+    {
+        return await _matchRepository.GetCountByTournamentAsync(tournamentId);
     }
 
     public async Task<Match?> GetByIdAsync(int id)
@@ -46,9 +56,9 @@ public class MatchService : IMatchService
         _logger.LogInformation("Retrieving match with ID: {MatchId}", id);
         return await _matchRepository.GetByIdWithDetailsAsync(id);
     }
+
     public async Task<Match> CreateAsync(Match match)
     {
-        // 1. Validar que el torneo existe y está en InProgress
         var tournament = await _tournamentRepository.GetByIdAsync(match.TournamentId);
         if (tournament == null)
             throw new KeyNotFoundException(
@@ -58,12 +68,10 @@ public class MatchService : IMatchService
             throw new InvalidOperationException(
                 "Solo se pueden programar partidos en torneos con estado InProgress");
 
-        // 2. Validar que los equipos son diferentes
         if (match.HomeTeamId == match.AwayTeamId)
             throw new InvalidOperationException(
                 "El equipo local y visitante deben ser diferentes");
 
-        // 3. Validar que ambos equipos existen
         var homeTeamExists = await _teamRepository.ExistsAsync(match.HomeTeamId);
         if (!homeTeamExists)
             throw new KeyNotFoundException(
@@ -74,7 +82,6 @@ public class MatchService : IMatchService
             throw new KeyNotFoundException(
                 $"No se encontró el equipo visitante con ID {match.AwayTeamId}");
 
-        // 4. Validar que ambos equipos están inscritos en el torneo
         var homeEnrolled = await _tournamentTeamRepository
             .GetByTournamentAndTeamAsync(match.TournamentId, match.HomeTeamId);
         if (homeEnrolled == null)
@@ -87,7 +94,6 @@ public class MatchService : IMatchService
             throw new InvalidOperationException(
                 "El equipo visitante no está inscrito en este torneo");
 
-        // 5. Validar que el árbitro existe
         var refereeExists = await _refereeRepository.ExistsAsync(match.RefereeId);
         if (!refereeExists)
             throw new KeyNotFoundException(
@@ -111,7 +117,6 @@ public class MatchService : IMatchService
             throw new InvalidOperationException(
                 "Solo se pueden editar partidos con estado Scheduled");
 
-        // Mismas validaciones que en Create
         if (match.HomeTeamId == match.AwayTeamId)
             throw new InvalidOperationException(
                 "El equipo local y visitante deben ser diferentes");

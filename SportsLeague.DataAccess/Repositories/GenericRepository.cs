@@ -20,6 +20,20 @@ public class GenericRepository<T> : IGenericRepository<T> where T : AuditBase
     {
         return await _dbSet.ToListAsync();
     }
+
+    public async Task<IEnumerable<T>> GetAllPagedAsync(int page, int pageSize)
+    {
+        return await _dbSet
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetCountAsync()
+    {
+        return await _dbSet.CountAsync();
+    }
+
     public async Task<T?> GetByIdAsync(int id)
     {
         return await _dbSet.FindAsync(id);

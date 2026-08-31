@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SportsLeague.Domain.DTOs;
 using SportsLeague.Domain.Interfaces.Services;
 
 namespace SportsLeague.API.Controllers;
@@ -15,44 +16,23 @@ public class StandingsController : ControllerBase
     }
 
     [HttpGet("standings")]
-    public async Task<ActionResult> GetStandings([FromQuery] int tournamentId)
+    public async Task<ActionResult<List<StandingDTO>>> GetStandings([FromQuery] int tournamentId)
     {
-        try
-        {
-            var standings = await _standingsService.GetStandingsAsync(tournamentId);
-            return Ok(standings);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var standings = await _standingsService.GetStandingsAsync(tournamentId);
+        return Ok(standings);
     }
 
     [HttpGet("stats/scorers")]
-    public async Task<ActionResult> GetTopScorers([FromQuery] int tournamentId)
+    public async Task<ActionResult<List<TopScorerDTO>>> GetTopScorers([FromQuery] int tournamentId)
     {
-        try
-        {
-            var scorers = await _standingsService.GetTopScorersAsync(tournamentId);
-            return Ok(scorers);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var scorers = await _standingsService.GetTopScorersAsync(tournamentId);
+        return Ok(scorers);
     }
 
     [HttpGet("stats/cards")]
-    public async Task<ActionResult> GetCardStats([FromQuery] int tournamentId)
+    public async Task<ActionResult<List<CardStatsDTO>>> GetCardStats([FromQuery] int tournamentId)
     {
-        try
-        {
-            var cards = await _standingsService.GetCardStatsAsync(tournamentId);
-            return Ok(cards);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var cards = await _standingsService.GetCardStatsAsync(tournamentId);
+        return Ok(cards);
     }
 }

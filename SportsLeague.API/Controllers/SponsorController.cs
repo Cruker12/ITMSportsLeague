@@ -20,7 +20,6 @@ public class SponsorController : ControllerBase
         _mapper = mapper;
     }
 
-    // ── GET ALL ─────────────────────────────────────────────────────────
     [HttpGet]
     public async Task<ActionResult<IEnumerable<SponsorResponseDTO>>> GetAll()
     {
@@ -28,98 +27,61 @@ public class SponsorController : ControllerBase
         return Ok(_mapper.Map<IEnumerable<SponsorResponseDTO>>(sponsors));
     }
 
-    // ── GET BY ID ───────────────────────────────────────────────────────
     [HttpGet("{id}")]
     public async Task<ActionResult<SponsorResponseDTO>> GetById(int id)
     {
         var sponsor = await _sponsorService.GetByIdAsync(id);
         if (sponsor == null)
             return NotFound(new { message = $"No se encontró el patrocinador con ID {id}." });
-
         return Ok(_mapper.Map<SponsorResponseDTO>(sponsor));
     }
 
-    // ── POST ────────────────────────────────────────────────────────────
     [HttpPost]
     public async Task<ActionResult<SponsorResponseDTO>> Create(SponsorRequestDTO dto)
     {
-        try
-        {
-            var sponsor = _mapper.Map<Sponsor>(dto);
-            var created = await _sponsorService.CreateAsync(sponsor);
-            var response = _mapper.Map<SponsorResponseDTO>(created);
-            return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
+        var sponsor = _mapper.Map<Sponsor>(dto);
+        var created = await _sponsorService.CreateAsync(sponsor);
+        var response = _mapper.Map<SponsorResponseDTO>(created);
+        return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
-    // ── PUT ─────────────────────────────────────────────────────────────
     [HttpPut("{id}")]
     public async Task<ActionResult> Update(int id, SponsorRequestDTO dto)
     {
-        try
-        {
-            var sponsor = _mapper.Map<Sponsor>(dto);
-            await _sponsorService.UpdateAsync(id, sponsor);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        var sponsor = _mapper.Map<Sponsor>(dto);
+        await _sponsorService.UpdateAsync(id, sponsor);
+        return NoContent();
     }
 
-    // ── DELETE ──────────────────────────────────────────────────────────
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
     {
-        try
-        {
-            await _sponsorService.DeleteAsync(id);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        await _sponsorService.DeleteAsync(id);
+        return NoContent();
     }
 
-    // ── POST /api/Sponsor/{id}/tournaments ───────────────────────────────
     [HttpPost("{id}/tournaments")]
     public async Task<ActionResult<TournamentSponsorResponseDTO>> RegisterToTournament(
         int id, TournamentSponsorRequestDTO dto)
     {
-        try
-        {
-            var link = await _sponsorService.RegisterSponsorToTournamentAsync(
-                               id, dto.TournamentId, dto.ContractAmount);
-            var response = _mapper.Map<TournamentSponsorResponseDTO>(link);
-            return CreatedAtAction(nameof(GetTournaments), new { id }, response);
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        var link = await _sponsorService.RegisterSponsorToTournamentAsync(
+                           id, dto.TournamentId, dto.ContractAmount);
+        var response = _mapper.Map<TournamentSponsorResponseDTO>(link);
+        return CreatedAtAction(nameof(GetTournaments), new { id }, response);
     }
 
-    // ── GET /api/Sponsor/{id}/tournaments ────────────────────────────────
     [HttpGet("{id}/tournaments")]
     public async Task<ActionResult<IEnumerable<TournamentSponsorResponseDTO>>> GetTournaments(int id)
     {
-        try
-        {
-            var links = await _sponsorService.GetTournamentsBySponsorAsync(id);
-            var response = _mapper.Map<IEnumerable<TournamentSponsorResponseDTO>>(links);
-            return Ok(response);
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        var links = await _sponsorService.GetTournamentsBySponsorAsync(id);
+        var response = _mapper.Map<IEnumerable<TournamentSponsorResponseDTO>>(links);
+        return Ok(response);
     }
 
-    // ── DELETE /api/Sponsor/{id}/tournaments/{tournamentId} ──────────────
     [HttpDelete("{id}/tournaments/{tournamentId}")]
     public async Task<ActionResult> RemoveFromTournament(int id, int tournamentId)
     {
-        try
-        {
-            await _sponsorService.RemoveSponsorFromTournamentAsync(id, tournamentId);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        await _sponsorService.RemoveSponsorFromTournamentAsync(id, tournamentId);
+        return NoContent();
     }
 }

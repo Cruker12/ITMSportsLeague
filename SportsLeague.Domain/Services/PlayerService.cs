@@ -21,32 +21,36 @@ public class PlayerService : IPlayerService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<Player>> GetAllAsync()
+    public async Task<IEnumerable<Player>> GetAllAsync(int? page = null, int? pageSize = null)
     {
-        _logger.LogInformation("Retrieving all players");
+        _logger.LogInformation("Retrieving players (page: {Page}, size: {PageSize})", page, pageSize);
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var paged = await _playerRepository.GetAllPagedAsync(page.Value, pageSize.Value);
+            return paged;
+        }
         return await _playerRepository.GetAllWithTeamAsync();
+    }
+
+    public async Task<int> GetCountAsync()
+    {
+        return await _playerRepository.GetCountAsync();
     }
 
     public async Task<Player?> GetByIdAsync(int id)
     {
         _logger.LogInformation("Retrieving player with ID: {PlayerId}", id);
         var player = await _playerRepository.GetByIdWithTeamAsync(id);
-
         if (player == null)
             _logger.LogWarning("Player with ID {PlayerId} not found", id);
-
         return player;
     }
+
     public async Task<IEnumerable<Player>> GetByTeamAsync(int teamId)
     {
-        // Validar que el equipo existe
         var teamExists = await _teamRepository.ExistsAsync(teamId);
         if (!teamExists)
-        {
-            _logger.LogWarning("Team with ID {TeamId} not found", teamId);
-            throw new KeyNotFoundException(
-                $"No se encontró el equipo con ID {teamId}");
-        }
+            throw new KeyNotFoundException($"No se encontró el equipo con ID {teamId}");
 
         _logger.LogInformation("Retrieving players for team ID: {TeamId}", teamId);
         return await _playerRepository.GetByTeamAsync(teamId);
@@ -54,26 +58,15 @@ public class PlayerService : IPlayerService
 
     public async Task<Player> CreateAsync(Player player)
     {
-        // Validar que el equipo existe
         var teamExists = await _teamRepository.ExistsAsync(player.TeamId);
         if (!teamExists)
-        {
-            _logger.LogWarning("Team with ID {TeamId} not found", player.TeamId);
-            throw new KeyNotFoundException(
-                $"No se encontró el equipo con ID {player.TeamId}");
-        }
+            throw new KeyNotFoundException($"No se encontró el equipo con ID {player.TeamId}");
 
-        // Validar número de camiseta único en el equipo
         var existingPlayer = await _playerRepository
             .GetByTeamAndNumberAsync(player.TeamId, player.Number);
         if (existingPlayer != null)
-        {
-            _logger.LogWarning(
-                "Number {Number} already taken in team {TeamId}",
-                player.Number, player.TeamId);
             throw new InvalidOperationException(
                 $"El número {player.Number} ya está en uso en este equipo");
-        }
 
         _logger.LogInformation(
             "Creating player: {FirstName} {LastName}",
@@ -85,30 +78,19 @@ public class PlayerService : IPlayerService
     {
         var existingPlayer = await _playerRepository.GetByIdAsync(id);
         if (existingPlayer == null)
-        {
-            throw new KeyNotFoundException(
-                $"No se encontró el jugador con ID {id}");
-        }
+            throw new KeyNotFoundException($"No se encontró el jugador con ID {id}");
 
-        // Validar que el nuevo equipo existe
         var teamExists = await _teamRepository.ExistsAsync(player.TeamId);
         if (!teamExists)
-        {
-            throw new KeyNotFoundException(
-                $"No se encontró el equipo con ID {player.TeamId}");
-        }
+            throw new KeyNotFoundException($"No se encontró el equipo con ID {player.TeamId}");
 
-        // Validar número único (si cambió el número o el equipo)
-        if (existingPlayer.Number != player.Number ||
-            existingPlayer.TeamId != player.TeamId)
+        if (existingPlayer.Number != player.Number || existingPlayer.TeamId != player.TeamId)
         {
             var conflict = await _playerRepository
                 .GetByTeamAndNumberAsync(player.TeamId, player.Number);
             if (conflict != null && conflict.Id != id)
-            {
                 throw new InvalidOperationException(
                     $"El número {player.Number} ya está en uso en este equipo");
-            }
         }
 
         existingPlayer.FirstName = player.FirstName;
@@ -126,10 +108,7 @@ public class PlayerService : IPlayerService
     {
         var exists = await _playerRepository.ExistsAsync(id);
         if (!exists)
-        {
-            throw new KeyNotFoundException(
-                $"No se encontró el jugador con ID {id}");
-        }
+            throw new KeyNotFoundException($"No se encontró el jugador con ID {id}");
 
         _logger.LogInformation("Deleting player with ID: {PlayerId}", id);
         await _playerRepository.DeleteAsync(id);

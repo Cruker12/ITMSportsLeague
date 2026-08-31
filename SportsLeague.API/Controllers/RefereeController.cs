@@ -13,23 +13,28 @@ public class RefereeController : ControllerBase
 {
     private readonly IRefereeService _refereeService;
     private readonly IMapper _mapper;
-    private readonly ILogger<RefereeController> _logger;
 
-    public RefereeController(
-        IRefereeService refereeService,
-        IMapper mapper,
-        ILogger<RefereeController> logger)
+    public RefereeController(IRefereeService refereeService, IMapper mapper)
     {
         _refereeService = refereeService;
         _mapper = mapper;
-        _logger = logger;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<RefereeResponseDTO>>> GetAll()
+    public async Task<ActionResult<PagedResultDTO<RefereeResponseDTO>>> GetAll(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        var referees = await _refereeService.GetAllAsync();
-        return Ok(_mapper.Map<IEnumerable<RefereeResponseDTO>>(referees));
+        var referees = await _refereeService.GetAllAsync(page, pageSize);
+        var totalCount = await _refereeService.GetCountAsync();
+        var items = _mapper.Map<IEnumerable<RefereeResponseDTO>>(referees);
+
+        return Ok(new PagedResultDTO<RefereeResponseDTO>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        });
     }
 
     [HttpGet("{id}")]
@@ -53,29 +58,15 @@ public class RefereeController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult> Update(int id, RefereeRequestDTO dto)
     {
-        try
-        {
-            var referee = _mapper.Map<Referee>(dto);
-            await _refereeService.UpdateAsync(id, referee);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        var referee = _mapper.Map<Referee>(dto);
+        await _refereeService.UpdateAsync(id, referee);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
     {
-        try
-        {
-            await _refereeService.DeleteAsync(id);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        await _refereeService.DeleteAsync(id);
+        return NoContent();
     }
 }

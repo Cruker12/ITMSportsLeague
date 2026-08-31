@@ -14,27 +14,27 @@ public class MatchController : ControllerBase
     private readonly IMatchService _matchService;
     private readonly IMapper _mapper;
 
-    public MatchController(
-        IMatchService matchService,
-        IMapper mapper)
+    public MatchController(IMatchService matchService, IMapper mapper)
     {
         _matchService = matchService;
         _mapper = mapper;
     }
 
     [HttpGet("tournament/{tournamentId}")]
-    public async Task<ActionResult<IEnumerable<MatchResponseDTO>>> GetByTournament(
-        int tournamentId)
+    public async Task<ActionResult<PagedResultDTO<MatchResponseDTO>>> GetByTournament(
+        int tournamentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        try
+        var matches = await _matchService.GetAllByTournamentAsync(tournamentId, page, pageSize);
+        var totalCount = await _matchService.GetCountByTournamentAsync(tournamentId);
+        var items = _mapper.Map<IEnumerable<MatchResponseDTO>>(matches);
+
+        return Ok(new PagedResultDTO<MatchResponseDTO>
         {
-            var matches = await _matchService.GetAllByTournamentAsync(tournamentId);
-            return Ok(_mapper.Map<IEnumerable<MatchResponseDTO>>(matches));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        });
     }
 
     [HttpGet("{id}")]
@@ -49,58 +49,32 @@ public class MatchController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<MatchResponseDTO>> Create(MatchRequestDTO dto)
     {
-        try
-        {
-            var match = _mapper.Map<Match>(dto);
-            var created = await _matchService.CreateAsync(match);
-            var matchWithDetails = await _matchService.GetByIdAsync(created.Id);
-            var responseDto = _mapper.Map<MatchResponseDTO>(matchWithDetails);
-            return CreatedAtAction(nameof(GetById), new { id = responseDto.Id }, responseDto);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
+        var match = _mapper.Map<Match>(dto);
+        var created = await _matchService.CreateAsync(match);
+        var matchWithDetails = await _matchService.GetByIdAsync(created.Id);
+        var responseDto = _mapper.Map<MatchResponseDTO>(matchWithDetails);
+        return CreatedAtAction(nameof(GetById), new { id = responseDto.Id }, responseDto);
     }
 
     [HttpPut("{id}")]
     public async Task<ActionResult> Update(int id, MatchRequestDTO dto)
     {
-        try
-        {
-            var match = _mapper.Map<Match>(dto);
-            await _matchService.UpdateAsync(id, match);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        var match = _mapper.Map<Match>(dto);
+        await _matchService.UpdateAsync(id, match);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
     {
-        try
-        {
-            await _matchService.DeleteAsync(id);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        await _matchService.DeleteAsync(id);
+        return NoContent();
     }
 
     [HttpPatch("{id}/status")]
     public async Task<ActionResult> UpdateStatus(int id, UpdateMatchStatusDTO dto)
     {
-        try
-        {
-            await _matchService.UpdateStatusAsync(id, dto.Status);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        await _matchService.UpdateStatusAsync(id, dto.Status);
+        return NoContent();
     }
 }

@@ -13,88 +13,60 @@ public class TeamController : ControllerBase
 {
     private readonly ITeamService _teamService;
     private readonly IMapper _mapper;
-    private readonly ILogger<TeamController> _logger;
 
-    public TeamController(
-        ITeamService teamService,
-        IMapper mapper,
-        ILogger<TeamController> logger)
+    public TeamController(ITeamService teamService, IMapper mapper)
     {
         _teamService = teamService;
         _mapper = mapper;
-        _logger = logger;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TeamResponseDTO>>> GetAll()
+    public async Task<ActionResult<PagedResultDTO<TeamResponseDTO>>> GetAll(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        var teams = await _teamService.GetAllAsync();
-        var teamsDto = _mapper.Map<IEnumerable<TeamResponseDTO>>(teams);
-        return Ok(teamsDto);
+        var teams = await _teamService.GetAllAsync(page, pageSize);
+        var totalCount = await _teamService.GetCountAsync();
+        var items = _mapper.Map<IEnumerable<TeamResponseDTO>>(teams);
+
+        return Ok(new PagedResultDTO<TeamResponseDTO>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        });
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<TeamResponseDTO>> GetById(int id)
     {
         var team = await _teamService.GetByIdAsync(id);
-
         if (team == null)
             return NotFound(new { message = $"Equipo con ID {id} no encontrado" });
-
-        var teamDto = _mapper.Map<TeamResponseDTO>(team);
-        return Ok(teamDto);
+        return Ok(_mapper.Map<TeamResponseDTO>(team));
     }
 
     [HttpPost]
     public async Task<ActionResult<TeamResponseDTO>> Create(TeamRequestDTO dto)
     {
-        try
-        {
-            var team = _mapper.Map<Team>(dto);
-            var createdTeam = await _teamService.CreateAsync(team);
-            var responseDto = _mapper.Map<TeamResponseDTO>(createdTeam);
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = responseDto.Id },
-                responseDto);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
+        var team = _mapper.Map<Team>(dto);
+        var createdTeam = await _teamService.CreateAsync(team);
+        var responseDto = _mapper.Map<TeamResponseDTO>(createdTeam);
+        return CreatedAtAction(nameof(GetById), new { id = responseDto.Id }, responseDto);
     }
 
     [HttpPut("{id}")]
     public async Task<ActionResult> Update(int id, TeamRequestDTO dto)
     {
-        try
-        {
-            var team = _mapper.Map<Team>(dto);
-            await _teamService.UpdateAsync(id, team);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
+        var team = _mapper.Map<Team>(dto);
+        await _teamService.UpdateAsync(id, team);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
     {
-        try
-        {
-            await _teamService.DeleteAsync(id);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
+        await _teamService.DeleteAsync(id);
+        return NoContent();
     }
 }

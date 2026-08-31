@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using SportsLeague.Domain.DTOs;
 using SportsLeague.Domain.Entities;
 using SportsLeague.Domain.Enums;
 using SportsLeague.Domain.Interfaces.Repositories;
@@ -34,25 +35,21 @@ public class StandingsService : IStandingsService
         _logger = logger;
     }
 
-    // GetStandingsAsync - Tabla de posiciones
-    public async Task<object> GetStandingsAsync(int tournamentId)
+    public async Task<List<StandingDTO>> GetStandingsAsync(int tournamentId)
     {
         var tournament = await _tournamentRepository.GetByIdAsync(tournamentId);
         if (tournament == null)
             throw new KeyNotFoundException(
                 $"No se encontró el torneo con ID {tournamentId}");
 
-        // Obtener equipos inscritos
         var tournamentTeams = await _tournamentTeamRepository
             .GetByTournamentAsync(tournamentId);
 
-        // Obtener partidos finalizados del torneo
         var matches = (await _matchRepository
             .GetByTournamentAsync(tournamentId))
             .Where(m => m.Status == MatchStatus.Finished)
             .ToList();
 
-        // Obtener resultados de esos partidos
         var matchIds = matches.Select(m => m.Id).ToHashSet();
         var allResults = new List<MatchResult>();
         foreach (var matchId in matchIds)
@@ -61,28 +58,23 @@ public class StandingsService : IStandingsService
             if (result != null) allResults.Add(result);
         }
 
-        // Construir diccionario matchId -> result para acceso rápido
         var resultsByMatch = allResults.ToDictionary(r => r.MatchId);
 
-        // Calcular standings para cada equipo
         var standings = tournamentTeams.Select(tt =>
         {
             var teamId = tt.TeamId;
             var teamName = tt.Team.Name;
 
-            // Partidos como local con resultado
             var homeMatches = matches
-                    .Where(m => m.HomeTeamId == teamId && resultsByMatch.ContainsKey(m.Id))
-                    .Select(m => resultsByMatch[m.Id])
-                    .ToList();
+                .Where(m => m.HomeTeamId == teamId && resultsByMatch.ContainsKey(m.Id))
+                .Select(m => resultsByMatch[m.Id])
+                .ToList();
 
-            // Partidos como visitante con resultado
             var awayMatches = matches
                 .Where(m => m.AwayTeamId == teamId && resultsByMatch.ContainsKey(m.Id))
                 .Select(m => resultsByMatch[m.Id])
                 .ToList();
 
-            // Calcular estadísticas
             int homeWins = homeMatches.Count(r => r.HomeGoals > r.AwayGoals);
             int homeDraws = homeMatches.Count(r => r.HomeGoals == r.AwayGoals);
             int homeLosses = homeMatches.Count(r => r.HomeGoals < r.AwayGoals);
@@ -97,18 +89,17 @@ public class StandingsService : IStandingsService
 
             int totalWins = homeWins + awayWins;
             int totalDraws = homeDraws + awayDraws;
-            int totalLosses = homeLosses + awayLosses;
             int totalGF = homeGF + awayGF;
             int totalGC = homeGC + awayGC;
 
-            return new
+            return new StandingDTO
             {
                 TeamId = teamId,
                 TeamName = teamName,
                 MatchesPlayed = homeMatches.Count + awayMatches.Count,
                 Wins = totalWins,
                 Draws = totalDraws,
-                Losses = totalLosses,
+                Losses = homeMatches.Count + awayMatches.Count - totalWins - totalDraws,
                 GoalsFor = totalGF,
                 GoalsAgainst = totalGC,
                 GoalDifference = totalGF - totalGC,
@@ -118,20 +109,7 @@ public class StandingsService : IStandingsService
         .OrderByDescending(s => s.Points)
         .ThenByDescending(s => s.GoalDifference)
         .ThenByDescending(s => s.GoalsFor)
-        .Select((s, index) => new
-        {
-            Position = index + 1,
-            s.TeamId,
-            s.TeamName,
-            s.MatchesPlayed,
-            s.Wins,
-            s.Draws,
-            s.Losses,
-            s.GoalsFor,
-            s.GoalsAgainst,
-            s.GoalDifference,
-            s.Points
-        })
+        .Select((s, index) => { s.Position = index + 1; return s; })
         .ToList();
 
         _logger.LogInformation(
@@ -139,19 +117,16 @@ public class StandingsService : IStandingsService
         return standings;
     }
 
-    // GetTopScorersAsync - Tabla de goleadores
-    public async Task<object> GetTopScorersAsync(int tournamentId)
+    public async Task<List<TopScorerDTO>> GetTopScorersAsync(int tournamentId)
     {
         var tournament = await _tournamentRepository.GetByIdAsync(tournamentId);
         if (tournament == null)
             throw new KeyNotFoundException(
                 $"No se encontró el torneo con ID {tournamentId}");
 
-        // Obtener todos los partidos del torneo
         var matches = await _matchRepository.GetByTournamentAsync(tournamentId);
         var matchIds = matches.Select(m => m.Id).ToHashSet();
 
-        // Obtener goles de esos partidos
         var allGoals = new List<Goal>();
         foreach (var matchId in matchIds)
         {
@@ -159,21 +134,19 @@ public class StandingsService : IStandingsService
             allGoals.AddRange(goals);
         }
 
-        // Excluir autogoles del conteo de goleadores
         var scorerGoals = allGoals
-            .Where(g => g.Type != Enums.GoalType.OwnGoal)
+            .Where(g => g.Type != GoalType.OwnGoal)
             .ToList();
 
-        // Agrupar por jugador
         var topScorers = scorerGoals
             .GroupBy(g => new { g.PlayerId, g.Player.FirstName, g.Player.LastName, g.Player.TeamId })
-            .Select(group => new
+            .Select(group => new TopScorerDTO
             {
                 PlayerId = group.Key.PlayerId,
                 PlayerName = group.Key.FirstName + " " + group.Key.LastName,
                 TeamName = group.First().Player.Team?.Name ?? "N/A",
                 Goals = group.Count(),
-                Penalties = group.Count(g => g.Type == Enums.GoalType.Penalty),
+                Penalties = group.Count(g => g.Type == GoalType.Penalty),
                 MatchesWithGoals = group.Select(g => g.MatchId).Distinct().Count()
             })
             .OrderByDescending(s => s.Goals)
@@ -185,8 +158,7 @@ public class StandingsService : IStandingsService
         return topScorers;
     }
 
-    // GetCardStatsAsync - Ranking de tarjetas
-    public async Task<object> GetCardStatsAsync(int tournamentId)
+    public async Task<List<CardStatsDTO>> GetCardStatsAsync(int tournamentId)
     {
         var tournament = await _tournamentRepository.GetByIdAsync(tournamentId);
         if (tournament == null)
@@ -205,13 +177,13 @@ public class StandingsService : IStandingsService
 
         var cardStats = allCards
             .GroupBy(c => new { c.PlayerId, c.Player.FirstName, c.Player.LastName })
-            .Select(group => new
+            .Select(group => new CardStatsDTO
             {
                 PlayerId = group.Key.PlayerId,
                 PlayerName = group.Key.FirstName + " " + group.Key.LastName,
                 TeamName = group.First().Player.Team?.Name ?? "N/A",
-                YellowCards = group.Count(c => c.Type == Enums.CardType.Yellow),
-                RedCards = group.Count(c => c.Type == Enums.CardType.Red),
+                YellowCards = group.Count(c => c.Type == CardType.Yellow),
+                RedCards = group.Count(c => c.Type == CardType.Red),
                 TotalCards = group.Count()
             })
             .OrderByDescending(s => s.RedCards)

@@ -18,10 +18,17 @@ public class RefereeService : IRefereeService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<Referee>> GetAllAsync()
+    public async Task<IEnumerable<Referee>> GetAllAsync(int? page = null, int? pageSize = null)
     {
-        _logger.LogInformation("Retrieving all referees");
+        _logger.LogInformation("Retrieving referees (page: {Page}, size: {PageSize})", page, pageSize);
+        if (page.HasValue && pageSize.HasValue)
+            return await _refereeRepository.GetAllPagedAsync(page.Value, pageSize.Value);
         return await _refereeRepository.GetAllAsync();
+    }
+
+    public async Task<int> GetCountAsync()
+    {
+        return await _refereeRepository.GetCountAsync();
     }
 
     public async Task<Referee?> GetByIdAsync(int id)

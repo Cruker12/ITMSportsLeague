@@ -5,7 +5,8 @@ namespace SportsLeague.Domain.Interfaces.Services;
 
 public interface ITournamentService
 {
-    Task<IEnumerable<Tournament>> GetAllAsync();
+    Task<IEnumerable<Tournament>> GetAllAsync(int? page = null, int? pageSize = null);
+    Task<int> GetCountAsync();
     Task<Tournament?> GetByIdAsync(int id);
     Task<Tournament> CreateAsync(Tournament tournament);
     Task UpdateAsync(int id, Tournament tournament);

@@ -32,6 +32,8 @@ Construir una API REST robusta que modele el comportamiento real de una liga dep
 - Validaciones de negocio cruzadas
 - DTOs con AutoMapper
 - Datos calculados en tiempo real con LINQ
+- Manejo global de excepciones con middleware
+- Paginación en listados principales
 
 ---
 
@@ -40,12 +42,14 @@ Construir una API REST robusta que modele el comportamiento real de una liga dep
 ```
 ┌──────────────────────────────────────────────────┐
 │               SportsLeague.API                   │
-│      Controllers · DTOs · Mappings · Swagger     │
+│   Controllers · DTOs · Mappings · Middlewares    │
+│                     · Swagger                    │
 └─────────────────────┬────────────────────────────┘
                       │  referencia
 ┌─────────────────────▼────────────────────────────┐
 │             SportsLeague.Domain                  │
-│     Entities · Enums · Interfaces · Services     │
+│  Entities · Enums · DTOs · Interfaces · Services │
+│                    · Helpers                     │
 └─────────────────────┬────────────────────────────┘
                       │  referencia
 ┌─────────────────────▼────────────────────────────┐
@@ -64,13 +68,16 @@ Construir una API REST robusta que modele el comportamiento real de una liga dep
 HTTP Request
      │
      ▼
-Controller (API)        → Recibe DTO, valida modelo
+ExceptionHandlingMiddleware  → Captura excepciones globalmente
      │
      ▼
-Service (Domain)        → Ejecuta lógica y validaciones de negocio
+Controller (API)             → Recibe DTO, valida modelo
      │
      ▼
-Repository (DataAccess) → Queries con EF Core
+Service (Domain)             → Ejecuta lógica y validaciones de negocio
+     │
+     ▼
+Repository (DataAccess)      → Queries con EF Core
      │
      ▼
 SQL Server
@@ -102,9 +109,11 @@ SportsLeague/
 │   │   └── Response/
 │   ├── Mappings/
 │   ├── Middlewares/
+│   │   └── ExceptionHandlingMiddleware.cs
 │   └── Program.cs
 │
 ├── SportsLeague.Domain/
+│   ├── DTOs/
 │   ├── Entities/
 │   ├── Enums/
 │   ├── Interfaces/
@@ -129,14 +138,16 @@ SportsLeague/
 - CRUD de jugadores vinculados a un equipo
 - Posiciones definidas por enum: `Goalkeeper`, `Defender`, `Midfielder`, `Forward`
 - Consulta de jugadores filtrada por equipo
+- Paginación en listados de equipos, jugadores y árbitros
 
 ---
 
 ### 🏟️ Torneos y Árbitros
 - Gestión de torneos con fechas de inicio y fin
-- Estados de torneo: `Upcoming` · `InProgress` · `Finished`
+- Estados de torneo: `Pending` · `InProgress` · `Finished`
 - Inscripción y desinscripción de equipos (relación N:M con índice único)
 - CRUD de árbitros con nacionalidad
+- Paginación en listados de torneos
 
 ---
 
@@ -146,19 +157,20 @@ SportsLeague/
 
 ```
 Scheduled ──► InProgress ──► Finished
-    └─────────────────────► Cancelled
+    │              │
+    └──► Suspended ◄┘
 ```
 
 > [!WARNING]
-> No se permite retroceder de estado ni saltar pasos. Cada transición tiene su propio endpoint.
+> No se permite retroceder de estado ni saltar pasos. La transición se realiza vía `PATCH /api/match/{id}/status` con un body `{ "status": 1 }`.
 
 ---
 
 ### 📋 Eventos de Partido
 - Registro de **goles** con tipo (`Normal`, `OwnGoal`, `Penalty`) y minuto
-- Registro de **tarjetas** con tipo (`Yellow`, `Red`, `YellowRed`) y minuto
+- Registro de **tarjetas** con tipo (`Yellow`, `Red`) y minuto
 - **Resultado final** (relación 1:1 con el partido)
-- Solo se permite registrar eventos en partidos `InProgress`
+- Solo se permite registrar eventos en partidos `InProgress` o `Finished`
 
 ---
 
@@ -167,13 +179,14 @@ Scheduled ──► InProgress ──► Finished
 - Criterios de desempate: puntos → diferencia de gol → goles a favor
 - Ranking de goleadores por torneo
 - Ranking de tarjetas por torneo
+- Tipado fuerte con DTOs concretos (`StandingDTO`, `TopScorerDTO`, `CardStatsDTO`)
 
 > [!TIP]
 > Al calcular en tiempo real, la tabla siempre refleja el estado actual sin riesgo de inconsistencias.
 
 ---
 
-### 📋 Alineaciones 
+### 📋 Alineaciones *(En desarrollo)*
 - Registro de jugadores convocados para un partido
 - Distinción entre titulares (`IsStarter: true`) y suplentes (`IsStarter: false`)
 - Máximo 11 titulares por equipo por partido
@@ -181,72 +194,104 @@ Scheduled ──► InProgress ──► Finished
 
 ---
 
+## 🔧 Mejoras de Calidad (Fase Actual)
+
+### ExceptionHandlingMiddleware
+- Manejo global de excepciones sin try/catch en controllers
+- `KeyNotFoundException` → HTTP 404
+- `InvalidOperationException` → HTTP 400
+- Excepciones no controladas → HTTP 500 con log
+
+### Paginación
+- Listados de Teams, Players, Referees, Tournaments y Matches soportan paginación
+- Parámetros: `?page=1&pageSize=10` (valores por defecto)
+- Respuesta envuelta en `PagedResultDTO<T>` con metadatos: `TotalCount`, `TotalPages`, `HasPrevious`, `HasNext`
+
+### Tipado fuerte en Standings
+- `IStandingsService` retorna `List<StandingDTO>`, `List<TopScorerDTO>`, `List<CardStatsDTO>`
+- Eliminación de tipos `object` y anonymous types en el servicio
+
+---
 
 ## 🌐 Endpoints
 
-### Teams · Players · Referees
+### Teams *(paginado)*
 
 ```
-GET    /api/team                            Listar equipos
-GET    /api/team/{id}                       Obtener equipo
-POST   /api/team                            Crear equipo
-PUT    /api/team/{id}                       Actualizar equipo
-DELETE /api/team/{id}                       Eliminar equipo
-
-GET    /api/player                          Listar jugadores (paginado)
-GET    /api/player/{id}                     Obtener jugador
-GET    /api/player/team/{teamId}            Jugadores de un equipo
-POST   /api/player                          Crear jugador
-PUT    /api/player/{id}                     Actualizar jugador
-DELETE /api/player/{id}                     Eliminar jugador
-
-GET    /api/referee                         Listar árbitros
-GET    /api/referee/{id}                    Obtener árbitro
-POST   /api/referee                         Crear árbitro
-PUT    /api/referee/{id}                    Actualizar árbitro
-DELETE /api/referee/{id}                    Eliminar árbitro
+GET    /api/team?page=1&pageSize=10     Listar equipos (paginado)
+GET    /api/team/{id}                   Obtener equipo
+POST   /api/team                        Crear equipo
+PUT    /api/team/{id}                   Actualizar equipo
+DELETE /api/team/{id}                   Eliminar equipo
 ```
 
-### Tournaments
+### Players *(paginado)*
 
 ```
-GET    /api/tournament                      Listar torneos
-GET    /api/tournament/{id}                 Obtener torneo
-POST   /api/tournament                      Crear torneo
-PUT    /api/tournament/{id}                 Actualizar torneo
-DELETE /api/tournament/{id}                 Eliminar torneo
-POST   /api/tournament/{id}/teams           Inscribir equipo
-DELETE /api/tournament/{id}/teams/{teamId}  Desinscribir equipo
+GET    /api/player?page=1&pageSize=10   Listar jugadores (paginado)
+GET    /api/player/{id}                 Obtener jugador
+GET    /api/player/team/{teamId}        Jugadores de un equipo
+POST   /api/player                      Crear jugador
+PUT    /api/player/{id}                 Actualizar jugador
+DELETE /api/player/{id}                 Eliminar jugador
 ```
 
-### Matches
+### Referees *(paginado)*
 
 ```
-GET    /api/match                           Listar partidos
-GET    /api/match/{id}                      Obtener partido
-POST   /api/match                           Crear partido → Scheduled
-PUT    /api/match/{id}/start                Iniciar partido → InProgress
-PUT    /api/match/{id}/finish               Finalizar partido → Finished
-PUT    /api/match/{id}/cancel               Cancelar partido → Cancelled
+GET    /api/referee?page=1&pageSize=10  Listar árbitros (paginado)
+GET    /api/referee/{id}                Obtener árbitro
+POST   /api/referee                     Crear árbitro
+PUT    /api/referee/{id}                Actualizar árbitro
+DELETE /api/referee/{id}                Eliminar árbitro
 ```
+
+### Tournaments *(paginado)*
+
+```
+GET    /api/tournament?page=1&pageSize=10               Listar torneos (paginado)
+GET    /api/tournament/{id}                             Obtener torneo
+POST   /api/tournament                                  Crear torneo
+PUT    /api/tournament/{id}                             Actualizar torneo
+DELETE /api/tournament/{id}                             Eliminar torneo
+PATCH  /api/tournament/{id}/status                      Cambiar estado
+POST   /api/tournament/{id}/teams                       Inscribir equipo
+GET    /api/tournament/{id}/teams                       Equipos inscritos
+```
+
+### Matches *(paginado)*
+
+```
+GET    /api/match/tournament/{tournamentId}?page=1&pageSize=10   Listar partidos por torneo (paginado)
+GET    /api/match/{id}                                           Obtener partido
+POST   /api/match                                                Crear partido → Scheduled
+PUT    /api/match/{id}                                           Actualizar partido
+DELETE /api/match/{id}                                           Eliminar partido
+PATCH  /api/match/{id}/status                                    Cambiar estado del partido
+```
+
+> [!NOTE]
+> Para cambiar el estado del partido, enviar `PATCH /api/match/{id}/status` con body `{ "status": 1 }` donde los valores son: `0=Scheduled`, `1=InProgress`, `2=Finished`, `3=Suspended`.
 
 ### Match Events
 
 ```
-POST   /api/match/{id}/goals                Registrar gol
-GET    /api/match/{id}/goals                Goles del partido
-POST   /api/match/{id}/cards                Registrar tarjeta
-GET    /api/match/{id}/cards                Tarjetas del partido
-POST   /api/match/{id}/result               Registrar resultado final
-GET    /api/match/{id}/result               Resultado del partido
+POST   /api/match/{matchId}/goals           Registrar gol
+GET    /api/match/{matchId}/goals           Goles del partido
+DELETE /api/match/{matchId}/goals/{goalId}  Eliminar gol
+POST   /api/match/{matchId}/cards           Registrar tarjeta
+GET    /api/match/{matchId}/cards           Tarjetas del partido
+DELETE /api/match/{matchId}/cards/{cardId}  Eliminar tarjeta
+POST   /api/match/{matchId}/result          Registrar resultado final
+GET    /api/match/{matchId}/result          Resultado del partido
 ```
 
 ### Standings
 
 ```
-GET    /api/standings/{tournamentId}            Tabla de posiciones
-GET    /api/standings/{tournamentId}/scorers    Ranking goleadores
-GET    /api/standings/{tournamentId}/cards      Ranking tarjetas
+GET    /api/standings?tournamentId=1                    Tabla de posiciones
+GET    /api/stats/scorers?tournamentId=1               Ranking goleadores
+GET    /api/stats/cards?tournamentId=1                  Ranking tarjetas
 ```
 
 ### Match Lineup *(En desarrollo)*
@@ -258,6 +303,13 @@ GET    /api/match/{matchId}/lineup/team/{id}    Alineación por equipo
 DELETE /api/match/{matchId}/lineup/{id}         Eliminar jugador de alineación
 ```
 
+### Infrastructure
+
+```
+GET    /health                                  Health check de la API
+GET    /swagger                                 Documentación Swagger UI
+```
+
 ---
 
 ## ✅ Reglas de Negocio
@@ -265,15 +317,23 @@ DELETE /api/match/{matchId}/lineup/{id}         Eliminar jugador de alineación
 | Contexto | Regla |
 |----------|-------|
 | Jugador | Debe pertenecer a un equipo existente |
+| Jugador | Número de camiseta único por equipo |
 | Inscripción | Un equipo no puede inscribirse dos veces en el mismo torneo |
+| Torneo | Solo se pueden editar/eliminar torneos en estado `Pending` |
+| Torneo | Solo se pueden inscribir equipos en torneos `Pending` |
 | Partido | HomeTeam y AwayTeam no pueden ser el mismo equipo |
 | Partido | Ambos equipos deben estar inscritos en el torneo |
+| Partido | Solo se pueden crear partidos en torneos `InProgress` |
+| Partido | Solo se pueden editar/eliminar partidos `Scheduled` |
 | Estado | No se permite retroceder ni saltar estados |
-| Eventos | Solo se registran en partidos `InProgress` |
+| Eventos | Solo se registran en partidos `InProgress` o `Finished` |
 | Eventos | El jugador debe pertenecer a uno de los dos equipos del partido |
 | Alineación | Solo se registra en partidos `Scheduled` |
 | Alineación | Máximo 11 titulares por equipo por partido |
 | Alineación | Un jugador no puede aparecer dos veces en la misma alineación |
+| Patrocinador | Nombre único a nivel de base de datos |
+| Patrocinador | Email con formato válido |
+| Patrocinador | Un patrocinador no puede vincularse dos veces al mismo torneo |
 
 ---
 
@@ -288,7 +348,6 @@ Al iniciar la API con la base de datos vacía, se cargan automáticamente los si
 | Árbitros | 4 | Árbitros colombianos |
 | Torneos | 1 | Liga BetPlay 2026-I en estado `InProgress` |
 | Inscripciones | 20 | Todos los equipos inscritos al torneo |
-| Partidos | 1 | Partido de prueba en estado `Scheduled` |
 
 > [!NOTE]
 > La ejecución es **idempotente**: si ya existen datos en la base, el Seeder no hace nada.
@@ -319,8 +378,8 @@ En `SportsLeague.API/appsettings.json`:
 ### 3️⃣ Aplicar migraciones
 
 ```bash
-dotnet ef database update \
-  --project SportsLeague.DataAccess \
+dotnet ef database update `
+  --project SportsLeague.DataAccess `
   --startup-project SportsLeague.API
 ```
 
@@ -352,13 +411,45 @@ https://localhost:{puerto}/swagger
 | Matches + Máquina de estados | ✅ Completo |
 | Goals, Cards, MatchResult | ✅ Completo |
 | Standings y Estadísticas | ✅ Completo |
+| Sponsors + Patrocinio | ✅ Completo |
 | Data Seeder | ✅ Completo |
+| Exception Handling Middleware | ✅ Completo |
+| Paginación en listados | ✅ Completo |
+| Tipado fuerte en Standings | ✅ Completo |
 | Match Lineup (Alineaciones) | 🚧 En desarrollo |
 
 </div>
 
+---
 
+## 📋 Changelog — Fase: Calidad, Robustez y Estabilidad
 
+### Agregado
+- `ExceptionHandlingMiddleware` para manejo global de excepciones
+- Paginación en endpoints de Teams, Players, Referees, Tournaments y Matches
+- DTOs tipados en Domain: `StandingDTO`, `TopScorerDTO`, `CardStatsDTO`
+- Método `GetCountAsync()` en repositorio genérico
+- Métodos `GetAllPagedAsync()` y `GetCountByTournamentAsync()` en repositorios
+- Endpoint `GET /health` para verificación de salud de la API
+
+### Cambiado
+- `IStandingsService` ahora retorna tipos concretos en lugar de `object`
+- `IStandingsService.GetStandingsAsync()` retorna `Task<List<StandingDTO>>`
+- `IStandingsService.GetTopScorersAsync()` retorna `Task<List<TopScorerDTO>>`
+- `IStandingsService.GetCardStatsAsync()` retorna `Task<List<CardStatsDTO>>`
+- Todos los controllers limpiados de bloques try/catch redundantes
+- Estados de torneo en README: `Upcoming` → `Pending` (corregido)
+- Diagrama de estados de partido: `Cancelled` → `Suspended` (corregido)
+- Endpoints de Matches: corregidos para reflejar `PATCH /status`
+- Endpoints de Standings: ahora usan query params `?tournamentId=`
+- README actualizado con documentación completa de la fase
+
+### Corregido
+- Nombre de archivo `Tournament..cs` → `Tournament.cs` (doble punto eliminado)
+- Discrepancia entre README y código en estados de torneo y partido
+- Documentación de endpoints desactualizada
+
+---
 
 <div align="center">
 

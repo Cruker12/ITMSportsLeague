@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SportsLeague.API.Middlewares;
 using SportsLeague.DataAccess.Context;
 using SportsLeague.DataAccess.Repositories;
 using SportsLeague.DataAccess.Seeders;
@@ -52,6 +53,21 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ── Health Checks ──
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<LeagueDbContext>();
+
+// ── CORS ──
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
 // ── Data Seeder ──
@@ -60,11 +76,13 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider
         .GetRequiredService<LeagueDbContext>();
 
-    await context.Database.MigrateAsync(); // Crea la BD + aplica migraciones
+    await context.Database.MigrateAsync();
     await DataSeeder.SeedAsync(context);
 }
 
 // ── Middleware Pipeline ──
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -73,7 +91,9 @@ if (app.Environment.IsDevelopment())
 
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
+app.UseCors("AllowAll");
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
 app.Run();

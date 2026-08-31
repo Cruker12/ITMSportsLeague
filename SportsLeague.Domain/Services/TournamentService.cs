@@ -25,10 +25,17 @@ public class TournamentService : ITournamentService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<Tournament>> GetAllAsync()
+    public async Task<IEnumerable<Tournament>> GetAllAsync(int? page = null, int? pageSize = null)
     {
-        _logger.LogInformation("Retrieving all tournaments");
+        _logger.LogInformation("Retrieving tournaments (page: {Page}, size: {PageSize})", page, pageSize);
+        if (page.HasValue && pageSize.HasValue)
+            return await _tournamentRepository.GetAllPagedAsync(page.Value, pageSize.Value);
         return await _tournamentRepository.GetAllAsync();
+    }
+
+    public async Task<int> GetCountAsync()
+    {
+        return await _tournamentRepository.GetCountAsync();
     }
 
     public async Task<Tournament?> GetByIdAsync(int id)
@@ -42,12 +49,9 @@ public class TournamentService : ITournamentService
 
     public async Task<Tournament> CreateAsync(Tournament tournament)
     {
-        // Validar que EndDate sea posterior a StartDate
         if (tournament.EndDate <= tournament.StartDate)
-        {
             throw new InvalidOperationException(
                 "La fecha de finalización debe ser posterior a la fecha de inicio");
-        }
 
         tournament.Status = TournamentStatus.Pending;
 
@@ -62,16 +66,12 @@ public class TournamentService : ITournamentService
             throw new KeyNotFoundException($"No se encontró el torneo con ID {id}");
 
         if (existing.Status != TournamentStatus.Pending)
-        {
             throw new InvalidOperationException(
                 "Solo se pueden editar torneos en estado Pending");
-        }
 
         if (tournament.EndDate <= tournament.StartDate)
-        {
             throw new InvalidOperationException(
                 "La fecha de finalización debe ser posterior a la fecha de inicio");
-        }
 
         existing.Name = tournament.Name;
         existing.Season = tournament.Season;
@@ -89,10 +89,8 @@ public class TournamentService : ITournamentService
             throw new KeyNotFoundException($"No se encontró el torneo con ID {id}");
 
         if (existing.Status != TournamentStatus.Pending)
-        {
             throw new InvalidOperationException(
                 "Solo se pueden eliminar torneos en estado Pending");
-        }
 
         _logger.LogInformation("Deleting tournament with ID: {TournamentId}", id);
         await _tournamentRepository.DeleteAsync(id);
@@ -104,7 +102,6 @@ public class TournamentService : ITournamentService
         if (tournament == null)
             throw new KeyNotFoundException($"No se encontró el torneo con ID {id}");
 
-        // Validar transiciones válidas
         var validTransition = (tournament.Status, newStatus) switch
         {
             (TournamentStatus.Pending, TournamentStatus.InProgress) => true,
@@ -113,10 +110,8 @@ public class TournamentService : ITournamentService
         };
 
         if (!validTransition)
-        {
             throw new InvalidOperationException(
                 $"No se puede cambiar de {tournament.Status} a {newStatus}");
-        }
 
         tournament.Status = newStatus;
 
@@ -128,33 +123,25 @@ public class TournamentService : ITournamentService
 
     public async Task RegisterTeamAsync(int tournamentId, int teamId)
     {
-        // Validar que el torneo existe
         var tournament = await _tournamentRepository.GetByIdAsync(tournamentId);
         if (tournament == null)
             throw new KeyNotFoundException(
                 $"No se encontró el torneo con ID {tournamentId}");
 
-        // Solo se pueden inscribir equipos en torneos Pending
         if (tournament.Status != TournamentStatus.Pending)
-        {
             throw new InvalidOperationException(
                 "Solo se pueden inscribir equipos en torneos con estado Pending");
-        }
 
-        // Validar que el equipo existe
         var teamExists = await _teamRepository.ExistsAsync(teamId);
         if (!teamExists)
             throw new KeyNotFoundException(
                 $"No se encontró el equipo con ID {teamId}");
 
-        // Validar que no esté ya inscrito
         var existing = await _tournamentTeamRepository
             .GetByTournamentAndTeamAsync(tournamentId, teamId);
         if (existing != null)
-        {
             throw new InvalidOperationException(
                 "Este equipo ya está inscrito en el torneo");
-        }
 
         var tournamentTeam = new TournamentTeam
         {

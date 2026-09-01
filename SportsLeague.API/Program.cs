@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using SportsLeague.API.Middlewares;
 using SportsLeague.DataAccess.Context;
@@ -46,10 +45,9 @@ builder.Services.AddScoped<IStandingsService, StandingsService>();
 
 
 // ── AutoMapper ──
-builder.Services.AddAutoMapper(typeof(Program).Assembly);
+builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(Program).Assembly));
 
 // ── FluentValidation ──
-builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // ── Controllers ──
@@ -95,14 +93,29 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapGet("/", () => Results.Redirect("/swagger"));
-
 app.UseCors("AllowAll");
 app.UseHttpsRedirection();
+
+// ── Static Files (Frontend) ──
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
+
+// ── SPA Fallback ──
+app.MapWhen(ctx => !ctx.Request.Path.StartsWithSegments("/api")
+    && !ctx.Request.Path.StartsWithSegments("/health")
+    && !ctx.Request.Path.StartsWithSegments("/swagger"),
+    spa =>
+    {
+        spa.Run(async context =>
+        {
+            context.Response.ContentType = "text/html";
+            await context.Response.SendFileAsync(
+                Path.Combine(app.Environment.WebRootPath, "index.html"));
+        });
+    });
+
 app.Run();
-
-
-

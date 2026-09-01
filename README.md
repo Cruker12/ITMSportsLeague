@@ -11,6 +11,9 @@
 <img src="https://img.shields.io/badge/Entity%20Framework%20Core%208-5C2D91?style=for-the-badge&logo=.net&logoColor=white" />
 <img src="https://img.shields.io/badge/SQL%20Server-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" />
 <img src="https://img.shields.io/badge/Swagger-API%20Documentation-85EA2D?style=for-the-badge&logo=swagger&logoColor=black" />
+<img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+<img src="https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+<img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
 
 <br/>
 <br/>
@@ -40,23 +43,26 @@ Construir una API REST robusta que modele el comportamiento real de una liga dep
 ## 🏛️ Arquitectura
 
 ```
-┌──────────────────────────────────────────────────┐
-│               SportsLeague.API                   │
-│   Controllers · DTOs · Mappings · Middlewares    │
-│                     · Swagger                    │
-└─────────────────────┬────────────────────────────┘
-                      │  referencia
-┌─────────────────────▼────────────────────────────┐
-│             SportsLeague.Domain                  │
-│  Entities · Enums · DTOs · Interfaces · Services │
-│                    · Helpers                     │
-└─────────────────────┬────────────────────────────┘
-                      │  referencia
-┌─────────────────────▼────────────────────────────┐
-│           SportsLeague.DataAccess                │
-│    DbContext · Repositories · Migrations         │
-│    Seeders                                       │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    SportsLeague.Frontend                         │
+│              React 19 · TypeScript · Vite 6                     │
+│      Vistas · Componentes · Hooks · API Client · Estilos        │
+└─────────────────────────────┬────────────────────────────────────┘
+                              │  proxy dev / archivos estáticos
+┌─────────────────────────────▼────────────────────────────────────┐
+│               SportsLeague.API                                  │
+│   Controllers · DTOs · Mappings · Middlewares · Swagger         │
+└─────────────────────────────┬────────────────────────────────────┘
+                              │  referencia
+┌─────────────────────────────▼────────────────────────────────────┐
+│             SportsLeague.Domain                                 │
+│  Entities · Enums · DTOs · Interfaces · Services · Helpers      │
+└─────────────────────────────┬────────────────────────────────────┘
+                              │  referencia
+┌─────────────────────────────▼────────────────────────────────────┐
+│           SportsLeague.DataAccess                               │
+│    DbContext · Repositories · Migrations · Seeders              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 > [!IMPORTANT]
@@ -89,11 +95,16 @@ SQL Server
 
 | Tecnología | Uso |
 |-----------|-----|
-| ASP.NET Core  | Framework web y capa REST |
-| Entity Framework Core  | ORM Code First |
+| ASP.NET Core | Framework web y capa REST |
+| Entity Framework Core | ORM Code First |
 | SQL Server | Base de datos relacional |
 | AutoMapper | Mapeo Entity ↔ DTO |
+| FluentValidation | Validación de DTOs con DataAnnotations |
 | Swagger / Swashbuckle | Documentación y pruebas interactivas |
+| React 19 | Frontend SPA |
+| Vite 6 | Bundler y dev server |
+| TypeScript 5 | Tipado estático en el frontend |
+| Axios | Cliente HTTP para llamadas a la API |
 
 ---
 
@@ -107,9 +118,11 @@ SportsLeague/
 │   ├── DTOs/
 │   │   ├── Request/
 │   │   └── Response/
+│   ├── Validators/          ← FluentValidation validators
 │   ├── Mappings/
 │   ├── Middlewares/
 │   │   └── ExceptionHandlingMiddleware.cs
+│   ├── wwwroot/             ← build del frontend (producción)
 │   └── Program.cs
 │
 ├── SportsLeague.Domain/
@@ -122,11 +135,25 @@ SportsLeague/
 │   ├── Services/
 │   └── Helpers/
 │
-└── SportsLeague.DataAccess/
-    ├── Context/
-    ├── Repositories/
-    ├── Seeders/
-    └── Migrations/
+├── SportsLeague.DataAccess/
+│   ├── Context/
+│   ├── Repositories/
+│   ├── Seeders/
+│   └── Migrations/
+│
+└── SportsLeague.API/SportsLeague.Frontend/
+    ├── src/
+    │   ├── types/           ← DTOs TypeScript (espejo del backend)
+    │   ├── api/             ← cliente HTTP (Axios)
+    │   ├── hooks/           ← useApi, usePagination, useCrud
+    │   ├── components/
+    │   │   ├── layout/      ← Sidebar, AppLayout
+    │   │   ├── ui/          ← DataTable, Modal, Pagination, StatusBadge
+    │   │   └── forms/       ← Team, Player, Referee, Tournament, Match, etc.
+    │   ├── pages/           ← 16 vistas del frontend
+    │   └── utils/           ← constants, formatters
+    ├── package.json
+    └── vite.config.ts       ← proxy /api → localhost:5262
 ```
 
 ---
@@ -191,6 +218,45 @@ Scheduled ──► InProgress ──► Finished
 - Distinción entre titulares (`IsStarter: true`) y suplentes (`IsStarter: false`)
 - Máximo 11 titulares por equipo por partido
 - Solo permitido en partidos `Scheduled`
+
+---
+
+## 🖥️ Frontend React
+
+### Funcionalidades del Frontend
+
+| Sección | Ruta | Funcionalidad |
+|---------|------|---------------|
+| Dashboard | `/` | Resumen con conteos de entidades |
+| Equipos | `/teams` | CRUD completo + roster de jugadores |
+| Jugadores | `/players` | CRUD con filtro por equipo |
+| Árbitros | `/referees` | CRUD |
+| Torneos | `/tournaments` | CRUD + cambiar estado + inscribir equipos |
+| Partidos | `/matches` | CRUD filtrado por torneo + eventos |
+| Patrocinadores | `/sponsors` | CRUD + vínculos con torneos |
+| Goleadores | `/stats/scorers` | Ranking de goleadores por torneo |
+| Tarjetas | `/stats/cards` | Ranking de tarjetas por torneo |
+| Probador API | `/api-tester` | Tester manual de endpoints |
+
+### Componentes Compartidos
+
+- **Layout**: Sidebar con navegación, AppLayout
+- **UI**: DataTable con paginación, Modal, ConfirmDialog, StatusBadge
+- **Forms**: TeamForm, PlayerForm, RefereeForm, TournamentForm, MatchForm, SponsorForm, GoalForm, CardForm, MatchResultForm
+- **Hooks**: `useApi`, `usePagination`, `useCrud` (CRUD genérico)
+- **Estilos**: CSS custom properties, diseño responsive con sidebar
+
+### Arquitectura del Frontend
+
+```
+src/
+├── types/       ← DTOs TypeScript (espejo de los DTOs del backend)
+├── api/         ← 8 módulos de cliente HTTP (Axios)
+├── hooks/       ← Custom hooks reutilizables
+├── components/  ← UI compartida (layout, ui, forms)
+├── pages/       ← 16 vistas (una por sección)
+└── utils/       ← Enums, labels, formateadores
+```
 
 ---
 
@@ -345,7 +411,7 @@ Al iniciar la API con la base de datos vacía, se cargan automáticamente los si
 |---------|----------|---------|
 | Equipos | 20 | Todos los equipos reales de la Liga BetPlay 2026 |
 | Jugadores | 80 | 4 por equipo con posiciones variadas |
-| Árbitros | 4 | Árbitros colombianos |
+| Árbitros | 6 | Árbitros colombianos |
 | Torneos | 1 | Liga BetPlay 2026-I en estado `InProgress` |
 | Inscripciones | 20 | Todos los equipos inscritos al torneo |
 
@@ -356,6 +422,17 @@ Al iniciar la API con la base de datos vacía, se cargan automáticamente los si
 
 ## ⚙️ Instalación
 
+### Requisitos Previos
+
+| Componente | Versión mínima | Verificar |
+|------------|---------------|-----------|
+| .NET SDK | 10.0+ | `dotnet --version` |
+| Node.js | 18+ | `node --version` |
+| npm | 9+ | `npm --version` |
+| SQL Server | 2019+ | `sqlcmd -V` |
+
+---
+
 ### 1️⃣ Clonar el repositorio
 
 ```bash
@@ -365,7 +442,7 @@ cd SportsLeagueAPI
 
 ### 2️⃣ Configurar la cadena de conexión
 
-En `SportsLeague.API/appsettings.json`:
+En `SportsLeague.API/appsettings.json`, verificar que la cadena de conexión apunte a tu instancia de SQL Server:
 
 ```json
 {
@@ -375,7 +452,16 @@ En `SportsLeague.API/appsettings.json`:
 }
 ```
 
-### 3️⃣ Aplicar migraciones
+> [!NOTE]
+> Si usas autenticación SQL Server, cambia `Trusted_Connection=True` por `User Id=sa;Password=tu_password;`.
+
+### 3️⃣ Restaurar paquetes NuGet
+
+```bash
+dotnet restore
+```
+
+### 4️⃣ Aplicar migraciones (crear la base de datos)
 
 ```bash
 dotnet ef database update `
@@ -383,20 +469,95 @@ dotnet ef database update `
   --startup-project SportsLeague.API
 ```
 
-### 4️⃣ Ejecutar la API
+> [!TIP]
+> La base de datos se crea automáticamente al ejecutar la API si no existe. El Data Seeder carga 20 equipos, 80 jugadores, 6 árbitros y 1 torneo en el primer arranque.
+
+### 5️⃣ Restaurar dependencias del frontend
+
+```bash
+cd SportsLeague.API/SportsLeague.Frontend
+npm install
+```
+
+### 6️⃣ Compilar el frontend
+
+```bash
+npm run build
+```
+
+Esto genera los archivos estáticos en `SportsLeague.API/wwwroot/` para servir el frontend junto con la API.
+
+### 7️⃣ Ejecutar la aplicación completa
+
+Desde la raíz del repositorio:
 
 ```bash
 dotnet run --project SportsLeague.API
 ```
 
-### 5️⃣ Abrir Swagger
-
-```
-https://localhost:{puerto}/swagger
-```
+La API arranca en:
+- **HTTP**: `http://localhost:5262`
+- **HTTPS**: `https://localhost:7208`
+- **Swagger**: `http://localhost:5262/swagger`
+- **Frontend**: `http://localhost:5262` (servido desde wwwroot)
 
 > [!TIP]
-> Los datos del Seeder se crean automáticamente en el primer arranque. No se necesita configuración manual.
+> En modo producción, la API sirve tanto los endpoints REST como el frontend React desde el mismo puerto.
+
+---
+
+### 🔧 Modo Desarrollo (con hot reload)
+
+Para desarrollar el frontend con hot reload en paralelo:
+
+**Terminal 1 — API:**
+```bash
+dotnet run --project SportsLeague.API
+```
+
+**Terminal 2 — Frontend (Vite dev server):**
+```bash
+cd SportsLeague.API/SportsLeague.Frontend
+npm run dev
+```
+
+| Servicio | URL | Descripción |
+|----------|-----|-------------|
+| API | `http://localhost:5262` | Backend REST + Swagger |
+| Frontend Dev | `http://localhost:3000` | Vite dev server con hot reload |
+
+> [!NOTE]
+> En modo desarrollo, el frontend en puerto 3000 redirige las llamadas `/api/*` a la API en puerto 5262 a través del proxy configurado en `vite.config.ts`.
+
+---
+
+### 🔨 Rebuild completo del frontend
+
+Si necesitas regenerar los archivos estáticos del frontend después de hacer cambios:
+
+```bash
+cd SportsLeague.API/SportsLeague.Frontend
+npm run build
+```
+
+Los archivos se generan automáticamente en `SportsLeague.API/wwwroot/`. Luego reinicia la API:
+
+```bash
+dotnet run --project SportsLeague.API
+```
+
+---
+
+### ❓ Solución de problemas
+
+| Problema | Solución |
+|----------|----------|
+| `dotnet restore` falla | Verificar que .NET SDK 10+ esté instalado: `dotnet --version` |
+| Error de SQL Server | Verificar cadena de conexión en `appsettings.json` y que SQL Server esté corriendo |
+| `npm install` falla | Verificar Node.js 18+: `node --version` |
+| `npm run build` falla errores TypeScript | Ejecutar `npx tsc --noEmit` para ver errores detallados |
+| Frontend no carga en producción | Verificar que `wwwroot/` tenga archivos después de `npm run build` |
+| Puerto 5262 en uso | Cambiar puerto en `SportsLeague.API/Properties/launchSettings.json` |
 
 ---
 
@@ -416,13 +577,43 @@ https://localhost:{puerto}/swagger
 | Exception Handling Middleware | ✅ Completo |
 | Paginación en listados | ✅ Completo |
 | Tipado fuerte en Standings | ✅ Completo |
+| FluentValidation + DataAnnotations | ✅ Completo |
+| Health Checks + CORS | ✅ Completo |
+| **Frontend React (16 vistas)** | ✅ Completo |
 | Match Lineup (Alineaciones) | 🚧 En desarrollo |
 
 </div>
 
 ---
 
-## 📋 Changelog — Fase: Calidad, Robustez y Estabilidad
+## 📋 Changelog
+
+### Fase 8: Validación de Entrada y DTOs
+
+#### Agregado
+- 13 validadores FluentValidation (`TeamRequestValidator`, `RegisterTeamValidator`, `PlayerRequestValidator`, `RefereeRequestValidator`, `TournamentRequestValidator`, `MatchRequestValidator`, `MatchResultRequestValidator`, `GoalRequestValidator`, `CardRequestValidator`, `SponsorRequestValidator`, `TournamentSponsorRequestValidator`, `UpdateMatchStatusValidator`, `UpdateStatusValidator`)
+- DataAnnotations en los 13 Request DTOs
+- DTO `PaginationParams` con validación
+- Health Checks en Program.cs
+- CORS configurado (`AllowAll`)
+
+#### Eliminado
+- DTOs duplicados en API layer (`StandingDTO`, `TopScorerDTO`, `CardStatsDTO`)
+
+### Fase 9: Frontend React
+
+#### Agregado
+- Proyecto Vite + React + TypeScript en `SportsLeague.Frontend`
+- 8 módulos de cliente HTTP (Axios)
+- 16 páginas (Dashboard, CRUD completo, Estadísticas, Probador API)
+- Componentes compartidos (DataTable, Modal, ConfirmDialog, StatusBadge, Sidebar)
+- 8 formularios reutilizables
+- Custom hooks (`useApi`, `usePagination`, `useCrud`)
+- Estilos CSS con CSS custom properties
+- Proxy de desarrollo Vite → API
+- Integración en `wwwroot` para producción
+
+### Fase 7: Calidad, Robustez y Estabilidad
 
 ### Agregado
 - `ExceptionHandlingMiddleware` para manejo global de excepciones
@@ -455,7 +646,7 @@ https://localhost:{puerto}/swagger
 
 ### 🏆 Sports League API · Gestión de Ligas Deportivas
 
-**.NET · Entity Framework Core · SQL Server · Arquitectura N-Capas**
+**ASP.NET Core · React · TypeScript · SQL Server · Arquitectura N-Capas**
 
 **Programación Web — ITM 2026**
 

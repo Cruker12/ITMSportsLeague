@@ -22,9 +22,9 @@ public class MatchController : ControllerBase
 
     [HttpGet("tournament/{tournamentId}")]
     public async Task<ActionResult<PagedResultDTO<MatchResponseDTO>>> GetByTournament(
-        int tournamentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        int tournamentId, [FromQuery] PaginationParams pagination)
     {
-        var matches = await _matchService.GetAllByTournamentAsync(tournamentId, page, pageSize);
+        var matches = await _matchService.GetAllByTournamentAsync(tournamentId, pagination.Page, pagination.PageSize);
         var totalCount = await _matchService.GetCountByTournamentAsync(tournamentId);
         var items = _mapper.Map<IEnumerable<MatchResponseDTO>>(matches);
 
@@ -32,8 +32,8 @@ public class MatchController : ControllerBase
         {
             Items = items,
             TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
         });
     }
 

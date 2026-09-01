@@ -22,9 +22,9 @@ public class TournamentController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResultDTO<TournamentResponseDTO>>> GetAll(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        [FromQuery] PaginationParams pagination)
     {
-        var tournaments = await _tournamentService.GetAllAsync(page, pageSize);
+        var tournaments = await _tournamentService.GetAllAsync(pagination.Page, pagination.PageSize);
         var totalCount = await _tournamentService.GetCountAsync();
         var items = _mapper.Map<IEnumerable<TournamentResponseDTO>>(tournaments);
 
@@ -32,8 +32,8 @@ public class TournamentController : ControllerBase
         {
             Items = items,
             TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
         });
     }
 

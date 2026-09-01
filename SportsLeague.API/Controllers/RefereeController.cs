@@ -22,9 +22,9 @@ public class RefereeController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResultDTO<RefereeResponseDTO>>> GetAll(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        [FromQuery] PaginationParams pagination)
     {
-        var referees = await _refereeService.GetAllAsync(page, pageSize);
+        var referees = await _refereeService.GetAllAsync(pagination.Page, pagination.PageSize);
         var totalCount = await _refereeService.GetCountAsync();
         var items = _mapper.Map<IEnumerable<RefereeResponseDTO>>(referees);
 
@@ -32,8 +32,8 @@ public class RefereeController : ControllerBase
         {
             Items = items,
             TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
         });
     }
 
@@ -42,7 +42,7 @@ public class RefereeController : ControllerBase
     {
         var referee = await _refereeService.GetByIdAsync(id);
         if (referee == null)
-            return NotFound(new { message = $"Árbitro con ID {id} no encontrado" });
+            return NotFound(new { message = $"Arbitro con ID {id} no encontrado" });
         return Ok(_mapper.Map<RefereeResponseDTO>(referee));
     }
 

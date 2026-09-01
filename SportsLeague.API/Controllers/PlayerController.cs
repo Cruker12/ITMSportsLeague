@@ -22,9 +22,9 @@ public class PlayerController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResultDTO<PlayerResponseDTO>>> GetAll(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        [FromQuery] PaginationParams pagination)
     {
-        var players = await _playerService.GetAllAsync(page, pageSize);
+        var players = await _playerService.GetAllAsync(pagination.Page, pagination.PageSize);
         var totalCount = await _playerService.GetCountAsync();
         var items = _mapper.Map<IEnumerable<PlayerResponseDTO>>(players);
 
@@ -32,8 +32,8 @@ public class PlayerController : ControllerBase
         {
             Items = items,
             TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
         });
     }
 

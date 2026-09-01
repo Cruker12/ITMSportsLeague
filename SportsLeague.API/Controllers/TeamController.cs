@@ -22,9 +22,9 @@ public class TeamController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResultDTO<TeamResponseDTO>>> GetAll(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        [FromQuery] PaginationParams pagination)
     {
-        var teams = await _teamService.GetAllAsync(page, pageSize);
+        var teams = await _teamService.GetAllAsync(pagination.Page, pagination.PageSize);
         var totalCount = await _teamService.GetCountAsync();
         var items = _mapper.Map<IEnumerable<TeamResponseDTO>>(teams);
 
@@ -32,8 +32,8 @@ public class TeamController : ControllerBase
         {
             Items = items,
             TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
         });
     }
 

@@ -1,3 +1,5 @@
+﻿using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using SportsLeague.API.Middlewares;
 using SportsLeague.DataAccess.Context;
@@ -45,6 +47,10 @@ builder.Services.AddScoped<IStandingsService, StandingsService>();
 
 // ── AutoMapper ──
 builder.Services.AddAutoMapper(typeof(Program).Assembly);
+
+// ── FluentValidation ──
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // ── Controllers ──
 builder.Services.AddControllers();
@@ -97,3 +103,6 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 app.Run();
+
+
+

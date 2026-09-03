@@ -1,0 +1,1 @@
+import{t as e}from"./client-GZv8jg-8.js";var t=`/match`,n={getByTournament:(n,r={page:1,pageSize:10})=>e.get(`${t}/tournament/${n}`,{params:r}),getById:n=>e.get(`${t}/${n}`),create:n=>e.post(t,n),update:(n,r)=>e.put(`${t}/${n}`,r),delete:n=>e.delete(`${t}/${n}`),updateStatus:(n,r)=>e.patch(`${t}/${n}/status`,r)};export{n as t};

@@ -1,6 +1,8 @@
-﻿import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sponsorApi } from '../../api/sponsor';
+import { useCrud } from '../../hooks/useCrud';
+import { useToastContext } from '../../contexts/ToastContext';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -10,121 +12,63 @@ import type { SponsorRequest, SponsorResponse } from '../../types/sponsor';
 
 export default function SponsorList() {
   const navigate = useNavigate();
-  const [sponsors, setSponsors] = useState<SponsorResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const toast = useToastContext();
+  const { items, totalCount, loading, fetchAll, createItem, updateItem, removeItem } =
+    useCrud<SponsorRequest, SponsorResponse>({
+      getAll: async (params) => {
+        const res = await sponsorApi.getAll();
+        const page = params.page || 1;
+        const pageSize = params.pageSize || 10;
+        const items = res.data;
+        const start = (page - 1) * pageSize;
+        return { data: { items: items.slice(start, start + pageSize), totalCount: items.length, page, pageSize, totalPages: Math.ceil(items.length / pageSize), hasPrevious: page > 1, hasNext: start + pageSize < items.length } };
+      },
+      getById: sponsorApi.getById,
+      create: sponsorApi.create,
+      update: sponsorApi.update,
+      delete: sponsorApi.delete,
+      onSuccess: (a) => toast.success(a === 'create' ? 'Patrocinador creado' : a === 'update' ? 'Patrocinador actualizado' : 'Patrocinador eliminado'),
+      onError: (msg) => toast.error(msg),
+    });
+
   const [showModal, setShowModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedSponsor, setSelectedSponsor] = useState<SponsorResponse | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editing, setEditing] = useState<SponsorResponse | null>(null);
+  const [deleting, setDeleting] = useState<SponsorResponse | null>(null);
 
-  const loadSponsors = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await sponsorApi.getAll();
-      setSponsors(response.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  useEffect(() => {
-    loadSponsors();
-  }, [loadSponsors]);
-
-  const handleCreate = () => {
-    setSelectedSponsor(null);
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  const handleEdit = (sponsor: SponsorResponse) => {
-    setSelectedSponsor(sponsor);
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  const handleDelete = (sponsor: SponsorResponse) => {
-    setSelectedSponsor(sponsor);
-    setShowConfirm(true);
-  };
+  const handleCreate = () => { setEditing(null); setShowModal(true); };
+  const handleEdit = (s: SponsorResponse) => { setEditing(s); setShowModal(true); };
+  const handleDelete = (s: SponsorResponse) => { setDeleting(s); setShowConfirm(true); };
 
   const handleSubmit = async (data: SponsorRequest) => {
-    try {
-      if (isEditing && selectedSponsor) {
-        await sponsorApi.update(selectedSponsor.id, data);
-      } else {
-        await sponsorApi.create(data);
-      }
-      setShowModal(false);
-      loadSponsors();
-    } catch (err) {
-      console.error(err);
-    }
+    const ok = editing ? await updateItem(editing.id, data) : await createItem(data);
+    if (ok) setShowModal(false);
   };
 
   const handleConfirmDelete = async () => {
-    if (selectedSponsor) {
-      try {
-        await sponsorApi.delete(selectedSponsor.id);
-        setShowConfirm(false);
-        loadSponsors();
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    if (deleting) { await removeItem(deleting.id); setShowConfirm(false); }
   };
 
   const columns = [
     { key: 'id', header: 'ID' },
     { key: 'name', header: 'Nombre' },
     { key: 'contactEmail', header: 'Email' },
-    { key: 'phone', header: 'Telefono' },
-    {
-      key: 'category',
-      header: 'Categoria',
-      render: (item: SponsorResponse) => <StatusBadge type="sponsor" value={item.category} />,
-    },
+    { key: 'category', header: 'Categoria', render: (item: SponsorResponse) => <StatusBadge type="sponsor" value={item.category} /> },
   ];
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Patrocinadores</h1>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          + Nuevo Patrocinador
-        </button>
+        <div><h1>Patrocinadores</h1><p className="subtitle">{totalCount} registros</p></div>
+        <button className="btn btn-primary" onClick={handleCreate}>+ Nuevo Patrocinador</button>
       </div>
-
-      <DataTable
-        columns={columns}
-        data={sponsors}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onView={(sponsor) => navigate(`/sponsors/${sponsor.id}`)}
-      />
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={isEditing ? 'Editar Patrocinador' : 'Nuevo Patrocinador'}
-      >
-        <SponsorForm
-          initialData={selectedSponsor || undefined}
-          onSubmit={handleSubmit}
-          onCancel={() => setShowModal(false)}
-        />
+      <DataTable columns={columns} data={items} loading={loading} onEdit={handleEdit} onDelete={handleDelete} onView={(s) => navigate(`/sponsors/${s.id}`)} />
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Patrocinador' : 'Nuevo Patrocinador'}>
+        <SponsorForm initialData={editing || undefined} onSubmit={handleSubmit} onCancel={() => setShowModal(false)} />
       </Modal>
-
-      <ConfirmDialog
-        isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={handleConfirmDelete}
-        title="Eliminar Patrocinador"
-        message={`Estas seguro de eliminar el patrocinador "${selectedSponsor?.name}"?`}
-      />
+      <ConfirmDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={handleConfirmDelete} title="Eliminar Patrocinador" message={`Estas seguro de eliminar "${deleting?.name}"?`} />
     </div>
   );
 }

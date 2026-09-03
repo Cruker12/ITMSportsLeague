@@ -1,5 +1,7 @@
-﻿import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { refereeApi } from '../../api/referee';
+import { useCrud } from '../../hooks/useCrud';
+import { useToastContext } from '../../contexts/ToastContext';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -8,75 +10,36 @@ import RefereeForm from '../../components/forms/RefereeForm';
 import type { RefereeRequest, RefereeResponse } from '../../types/referee';
 
 export default function RefereeList() {
-  const [referees, setReferees] = useState<RefereeResponse[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const toast = useToastContext();
+  const { items, totalCount, loading, page, setPage, totalPages, fetchAll, createItem, updateItem, removeItem } =
+    useCrud<RefereeRequest, RefereeResponse>({
+      getAll: refereeApi.getAll,
+      getById: refereeApi.getById,
+      create: refereeApi.create,
+      update: refereeApi.update,
+      delete: refereeApi.delete,
+      onSuccess: (a) => toast.success(a === 'create' ? 'Arbitro creado' : a === 'update' ? 'Arbitro actualizado' : 'Arbitro eliminado'),
+      onError: (msg) => toast.error(msg),
+    });
+
   const [showModal, setShowModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedReferee, setSelectedReferee] = useState<RefereeResponse | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editing, setEditing] = useState<RefereeResponse | null>(null);
+  const [deleting, setDeleting] = useState<RefereeResponse | null>(null);
 
-  const loadReferees = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await refereeApi.getAll({ page, pageSize: 10 });
-      setReferees(response.data.items);
-      setTotalCount(response.data.totalCount);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  useEffect(() => {
-    loadReferees();
-  }, [loadReferees]);
-
-  const totalPages = Math.ceil(totalCount / 10);
-
-  const handleCreate = () => {
-    setSelectedReferee(null);
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  const handleEdit = (referee: RefereeResponse) => {
-    setSelectedReferee(referee);
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  const handleDelete = (referee: RefereeResponse) => {
-    setSelectedReferee(referee);
-    setShowConfirm(true);
-  };
+  const handleCreate = () => { setEditing(null); setShowModal(true); };
+  const handleEdit = (r: RefereeResponse) => { setEditing(r); setShowModal(true); };
+  const handleDelete = (r: RefereeResponse) => { setDeleting(r); setShowConfirm(true); };
 
   const handleSubmit = async (data: RefereeRequest) => {
-    try {
-      if (isEditing && selectedReferee) {
-        await refereeApi.update(selectedReferee.id, data);
-      } else {
-        await refereeApi.create(data);
-      }
-      setShowModal(false);
-      loadReferees();
-    } catch (err) {
-      console.error(err);
-    }
+    const ok = editing ? await updateItem(editing.id, data) : await createItem(data);
+    if (ok) setShowModal(false);
   };
 
   const handleConfirmDelete = async () => {
-    if (selectedReferee) {
-      try {
-        await refereeApi.delete(selectedReferee.id);
-        setShowConfirm(false);
-        loadReferees();
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    if (deleting) { await removeItem(deleting.id); setShowConfirm(false); }
   };
 
   const columns = [
@@ -89,41 +52,15 @@ export default function RefereeList() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Arbitros</h1>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          + Nuevo Arbitro
-        </button>
+        <div><h1>Arbitros</h1><p className="subtitle">{totalCount} registros</p></div>
+        <button className="btn btn-primary" onClick={handleCreate}>+ Nuevo Arbitro</button>
       </div>
-
-      <DataTable
-        columns={columns}
-        data={referees}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
+      <DataTable columns={columns} data={items} loading={loading} onEdit={handleEdit} onDelete={handleDelete} />
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={isEditing ? 'Editar Arbitro' : 'Nuevo Arbitro'}
-      >
-        <RefereeForm
-          initialData={selectedReferee || undefined}
-          onSubmit={handleSubmit}
-          onCancel={() => setShowModal(false)}
-        />
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Arbitro' : 'Nuevo Arbitro'}>
+        <RefereeForm initialData={editing || undefined} onSubmit={handleSubmit} onCancel={() => setShowModal(false)} />
       </Modal>
-
-      <ConfirmDialog
-        isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={handleConfirmDelete}
-        title="Eliminar Arbitro"
-        message={`Estas seguro de eliminar al arbitro "${selectedReferee?.firstName} ${selectedReferee?.lastName}"?`}
-      />
+      <ConfirmDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={handleConfirmDelete} title="Eliminar Arbitro" message={`Estas seguro de eliminar a "${deleting?.firstName} ${deleting?.lastName}"?`} />
     </div>
   );
 }

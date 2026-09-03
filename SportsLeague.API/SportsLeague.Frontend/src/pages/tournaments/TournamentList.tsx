@@ -1,6 +1,8 @@
-﻿import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tournamentApi } from '../../api/tournament';
+import { useCrud } from '../../hooks/useCrud';
+import { useToastContext } from '../../contexts/ToastContext';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -12,130 +14,60 @@ import { formatDate } from '../../utils/formatters';
 
 export default function TournamentList() {
   const navigate = useNavigate();
-  const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const toast = useToastContext();
+  const { items, totalCount, loading, page, setPage, totalPages, fetchAll, createItem, updateItem, removeItem } =
+    useCrud<TournamentRequest, TournamentResponse>({
+      getAll: tournamentApi.getAll,
+      getById: tournamentApi.getById,
+      create: tournamentApi.create,
+      update: tournamentApi.update,
+      delete: tournamentApi.delete,
+      onSuccess: (a) => toast.success(a === 'create' ? 'Torneo creado' : a === 'update' ? 'Torneo actualizado' : 'Torneo eliminado'),
+      onError: (msg) => toast.error(msg),
+    });
+
   const [showModal, setShowModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedTournament, setSelectedTournament] = useState<TournamentResponse | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editing, setEditing] = useState<TournamentResponse | null>(null);
+  const [deleting, setDeleting] = useState<TournamentResponse | null>(null);
 
-  const loadTournaments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await tournamentApi.getAll({ page, pageSize: 10 });
-      setTournaments(response.data.items);
-      setTotalCount(response.data.totalCount);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  useEffect(() => {
-    loadTournaments();
-  }, [loadTournaments]);
-
-  const totalPages = Math.ceil(totalCount / 10);
-
-  const handleCreate = () => {
-    setSelectedTournament(null);
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  const handleEdit = (tournament: TournamentResponse) => {
-    setSelectedTournament(tournament);
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  const handleDelete = (tournament: TournamentResponse) => {
-    setSelectedTournament(tournament);
-    setShowConfirm(true);
-  };
+  const handleCreate = () => { setEditing(null); setShowModal(true); };
+  const handleEdit = (t: TournamentResponse) => { setEditing(t); setShowModal(true); };
+  const handleDelete = (t: TournamentResponse) => { setDeleting(t); setShowConfirm(true); };
 
   const handleSubmit = async (data: TournamentRequest) => {
-    try {
-      if (isEditing && selectedTournament) {
-        await tournamentApi.update(selectedTournament.id, data);
-      } else {
-        await tournamentApi.create(data);
-      }
-      setShowModal(false);
-      loadTournaments();
-    } catch (err) {
-      console.error(err);
-    }
+    const ok = editing ? await updateItem(editing.id, data) : await createItem(data);
+    if (ok) setShowModal(false);
   };
 
   const handleConfirmDelete = async () => {
-    if (selectedTournament) {
-      try {
-        await tournamentApi.delete(selectedTournament.id);
-        setShowConfirm(false);
-        loadTournaments();
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    if (deleting) { await removeItem(deleting.id); setShowConfirm(false); }
   };
 
   const columns = [
     { key: 'id', header: 'ID' },
     { key: 'name', header: 'Nombre' },
     { key: 'season', header: 'Temporada' },
-    {
-      key: 'status',
-      header: 'Estado',
-      render: (item: TournamentResponse) => <StatusBadge type="tournament" value={item.status} />,
-    },
-    { key: 'teamsCount', header: 'Equipos' },
+    { key: 'status', header: 'Estado', render: (item: TournamentResponse) => <StatusBadge type="tournament" value={item.status} /> },
     { key: 'startDate', header: 'Inicio', render: (item: TournamentResponse) => formatDate(item.startDate) },
     { key: 'endDate', header: 'Fin', render: (item: TournamentResponse) => formatDate(item.endDate) },
+    { key: 'teamsCount', header: 'Equipos' },
   ];
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Torneos</h1>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          + Nuevo Torneo
-        </button>
+        <div><h1>Torneos</h1><p className="subtitle">{totalCount} registros</p></div>
+        <button className="btn btn-primary" onClick={handleCreate}>+ Nuevo Torneo</button>
       </div>
-
-      <DataTable
-        columns={columns}
-        data={tournaments}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onView={(tournament) => navigate(`/tournaments/${tournament.id}`)}
-      />
-
+      <DataTable columns={columns} data={items} loading={loading} onEdit={handleEdit} onDelete={handleDelete} onView={(t) => navigate(`/tournaments/${t.id}`)} />
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={isEditing ? 'Editar Torneo' : 'Nuevo Torneo'}
-      >
-        <TournamentForm
-          initialData={selectedTournament || undefined}
-          onSubmit={handleSubmit}
-          onCancel={() => setShowModal(false)}
-        />
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Torneo' : 'Nuevo Torneo'}>
+        <TournamentForm initialData={editing || undefined} onSubmit={handleSubmit} onCancel={() => setShowModal(false)} />
       </Modal>
-
-      <ConfirmDialog
-        isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={handleConfirmDelete}
-        title="Eliminar Torneo"
-        message={`Estas seguro de eliminar el torneo "${selectedTournament?.name}"?`}
-      />
+      <ConfirmDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={handleConfirmDelete} title="Eliminar Torneo" message={`Estas seguro de eliminar "${deleting?.name}"?`} />
     </div>
   );
 }

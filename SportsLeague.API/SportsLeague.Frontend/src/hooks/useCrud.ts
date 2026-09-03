@@ -7,6 +7,8 @@ interface UseCrudOptions<TRequest, TResponse> {
   create: (data: TRequest) => Promise<{ data: TResponse }>;
   update: (id: number, data: TRequest) => Promise<unknown>;
   delete: (id: number) => Promise<unknown>;
+  onSuccess?: (action: 'create' | 'update' | 'delete') => void;
+  onError?: (message: string) => void;
 }
 
 interface UseCrudResult<TRequest, TResponse> {
@@ -17,6 +19,7 @@ interface UseCrudResult<TRequest, TResponse> {
   error: string | null;
   page: number;
   pageSize: number;
+  totalPages: number;
   setPage: (page: number) => void;
   fetchAll: () => Promise<void>;
   fetchById: (id: number) => Promise<void>;
@@ -45,7 +48,9 @@ export function useCrud<TRequest, TResponse>(
       setItems(response.data.items);
       setTotalCount(response.data.totalCount);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar datos');
+      const msg = err instanceof Error ? err.message : 'Error al cargar datos';
+      setError(msg);
+      options.onError?.(msg);
     } finally {
       setLoading(false);
     }
@@ -58,7 +63,9 @@ export function useCrud<TRequest, TResponse>(
       const response = await options.getById(id);
       setSelectedItem(response.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar registro');
+      const msg = err instanceof Error ? err.message : 'Error al cargar registro';
+      setError(msg);
+      options.onError?.(msg);
     } finally {
       setLoading(false);
     }
@@ -70,9 +77,12 @@ export function useCrud<TRequest, TResponse>(
     try {
       await options.create(data);
       await fetchAll();
+      options.onSuccess?.('create');
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear registro');
+      const msg = err instanceof Error ? err.message : 'Error al crear registro';
+      setError(msg);
+      options.onError?.(msg);
       return false;
     } finally {
       setLoading(false);
@@ -85,9 +95,12 @@ export function useCrud<TRequest, TResponse>(
     try {
       await options.update(id, data);
       await fetchAll();
+      options.onSuccess?.('update');
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al actualizar registro');
+      const msg = err instanceof Error ? err.message : 'Error al actualizar registro';
+      setError(msg);
+      options.onError?.(msg);
       return false;
     } finally {
       setLoading(false);
@@ -100,9 +113,12 @@ export function useCrud<TRequest, TResponse>(
     try {
       await options.delete(id);
       await fetchAll();
+      options.onSuccess?.('delete');
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar registro');
+      const msg = err instanceof Error ? err.message : 'Error al eliminar registro';
+      setError(msg);
+      options.onError?.(msg);
       return false;
     } finally {
       setLoading(false);
@@ -110,6 +126,8 @@ export function useCrud<TRequest, TResponse>(
   }, [options, fetchAll]);
 
   const clearError = useCallback(() => setError(null), []);
+
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   return {
     items,
@@ -119,6 +137,7 @@ export function useCrud<TRequest, TResponse>(
     error,
     page,
     pageSize,
+    totalPages,
     setPage,
     fetchAll,
     fetchById,

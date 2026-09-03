@@ -1,0 +1,1 @@
+var e=e=>new Date(e).toLocaleDateString(`es-CO`,{year:`numeric`,month:`2-digit`,day:`2-digit`}),t=e=>new Date(e).toLocaleDateString(`es-CO`,{year:`numeric`,month:`2-digit`,day:`2-digit`,hour:`2-digit`,minute:`2-digit`});export{t as n,e as t};

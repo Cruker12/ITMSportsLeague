@@ -1,6 +1,8 @@
-﻿import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { teamApi } from '../../api/team';
+import { useCrud } from '../../hooks/useCrud';
+import { useToastContext } from '../../contexts/ToastContext';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -11,74 +13,38 @@ import { formatDate } from '../../utils/formatters';
 
 export default function TeamList() {
   const navigate = useNavigate();
-  const [teams, setTeams] = useState<TeamResponse[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const toast = useToastContext();
+  const { items, totalCount, loading, page, setPage, totalPages, fetchAll, createItem, updateItem, removeItem } =
+    useCrud<TeamRequest, TeamResponse>({
+      getAll: teamApi.getAll,
+      getById: teamApi.getById,
+      create: teamApi.create,
+      update: teamApi.update,
+      delete: teamApi.delete,
+      onSuccess: (action) => toast.success(action === 'create' ? 'Equipo creado' : action === 'update' ? 'Equipo actualizado' : 'Equipo eliminado'),
+      onError: (msg) => toast.error(msg),
+    });
+
   const [showModal, setShowModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<TeamResponse | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editing, setEditing] = useState<TeamResponse | null>(null);
+  const [deleting, setDeleting] = useState<TeamResponse | null>(null);
 
-  const loadTeams = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await teamApi.getAll({ page, pageSize: 10 });
-      setTeams(response.data.items);
-      setTotalCount(response.data.totalCount);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  useEffect(() => {
-    loadTeams();
-  }, [loadTeams]);
-
-  const totalPages = Math.ceil(totalCount / 10);
-
-  const handleCreate = () => {
-    setSelectedTeam(null);
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  const handleEdit = (team: TeamResponse) => {
-    setSelectedTeam(team);
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  const handleDelete = (team: TeamResponse) => {
-    setSelectedTeam(team);
-    setShowConfirm(true);
-  };
+  const handleCreate = () => { setEditing(null); setShowModal(true); };
+  const handleEdit = (t: TeamResponse) => { setEditing(t); setShowModal(true); };
+  const handleDelete = (t: TeamResponse) => { setDeleting(t); setShowConfirm(true); };
 
   const handleSubmit = async (data: TeamRequest) => {
-    try {
-      if (isEditing && selectedTeam) {
-        await teamApi.update(selectedTeam.id, data);
-      } else {
-        await teamApi.create(data);
-      }
-      setShowModal(false);
-      loadTeams();
-    } catch (err) {
-      console.error(err);
-    }
+    const ok = editing ? await updateItem(editing.id, data) : await createItem(data);
+    if (ok) setShowModal(false);
   };
 
   const handleConfirmDelete = async () => {
-    if (selectedTeam) {
-      try {
-        await teamApi.delete(selectedTeam.id);
-        setShowConfirm(false);
-        loadTeams();
-      } catch (err) {
-        console.error(err);
-      }
+    if (deleting) {
+      await removeItem(deleting.id);
+      setShowConfirm(false);
     }
   };
 
@@ -93,42 +59,15 @@ export default function TeamList() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Equipos</h1>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          + Nuevo Equipo
-        </button>
+        <div><h1>Equipos</h1><p className="subtitle">{totalCount} registros</p></div>
+        <button className="btn btn-primary" onClick={handleCreate}>+ Nuevo Equipo</button>
       </div>
-
-      <DataTable
-        columns={columns}
-        data={teams}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onView={(team) => navigate(`/teams/${team.id}`)}
-      />
-
+      <DataTable columns={columns} data={items} loading={loading} onEdit={handleEdit} onDelete={handleDelete} onView={(t) => navigate(`/teams/${t.id}`)} />
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={isEditing ? 'Editar Equipo' : 'Nuevo Equipo'}
-      >
-        <TeamForm
-          initialData={selectedTeam || undefined}
-          onSubmit={handleSubmit}
-          onCancel={() => setShowModal(false)}
-        />
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Equipo' : 'Nuevo Equipo'}>
+        <TeamForm initialData={editing || undefined} onSubmit={handleSubmit} onCancel={() => setShowModal(false)} />
       </Modal>
-
-      <ConfirmDialog
-        isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={handleConfirmDelete}
-        title="Eliminar Equipo"
-        message={`Estas seguro de eliminar el equipo "${selectedTeam?.name}"?`}
-      />
+      <ConfirmDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={handleConfirmDelete} title="Eliminar Equipo" message={`Estas seguro de eliminar "${deleting?.name}"?`} />
     </div>
   );
 }

@@ -1,0 +1,1 @@
+import{t as e}from"./client-GZv8jg-8.js";var t=`/referee`,n={getAll:(n={page:1,pageSize:10})=>e.get(t,{params:n}),getById:n=>e.get(`${t}/${n}`),create:n=>e.post(t,n),update:(n,r)=>e.put(`${t}/${n}`,r),delete:n=>e.delete(`${t}/${n}`)};export{n as t};

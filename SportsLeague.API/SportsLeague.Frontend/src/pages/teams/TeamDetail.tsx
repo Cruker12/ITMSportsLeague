@@ -2,6 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { teamApi } from '../../api/team';
 import { playerApi } from '../../api/player';
+import { useToastContext } from '../../contexts/ToastContext';
 import DataTable from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
 import type { TeamResponse } from '../../types/team';
@@ -11,6 +12,7 @@ import { formatDate } from '../../utils/formatters';
 export default function TeamDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToastContext();
   const [team, setTeam] = useState<TeamResponse | null>(null);
   const [players, setPlayers] = useState<PlayerResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,13 +30,13 @@ export default function TeamDetail() {
         setTeam(teamRes.data);
         setPlayers(playersRes.data);
       } catch (err) {
-        console.error(err);
+        toast.error(err instanceof Error ? err.message : 'Error al cargar datos');
       } finally {
         setLoading(false);
       }
     };
     loadData();
-  }, [id]);
+  }, [id, toast]);
 
   if (loading) return <div className="loading">Cargando equipo...</div>;
   if (!team) return <div className="empty-state">Equipo no encontrado</div>;
@@ -43,24 +45,17 @@ export default function TeamDetail() {
     { key: 'number', header: '#' },
     { key: 'firstName', header: 'Nombre' },
     { key: 'lastName', header: 'Apellido' },
-    {
-      key: 'position',
-      header: 'Posicion',
-      render: (item: PlayerResponse) => <StatusBadge type="position" value={item.position} />,
-    },
+    { key: 'position', header: 'Posicion', render: (item: PlayerResponse) => <StatusBadge type="position" value={item.position} /> },
   ];
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
-          <button className="btn btn-sm" onClick={() => navigate('/teams')}>
-            ← Volver
-          </button>
+          <button className="btn btn-sm" onClick={() => navigate('/teams')}>← Volver</button>
           <h1>{team.name}</h1>
         </div>
       </div>
-
       <div className="detail-grid">
         <div className="detail-card">
           <h3>Informacion del Equipo</h3>
@@ -70,7 +65,6 @@ export default function TeamDetail() {
           <p><strong>Creado:</strong> {formatDate(team.createdAt)}</p>
         </div>
       </div>
-
       <h2>Jugadores ({players.length})</h2>
       <DataTable columns={playerColumns} data={players} loading={false} />
     </div>

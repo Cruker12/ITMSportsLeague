@@ -1,109 +1,93 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
+import FormField from '../ui/FormField';
+import { teamApi } from '../../api/team';
 import type { PlayerRequest, PlayerResponse } from '../../types/player';
+import type { TeamResponse } from '../../types/team';
 import { PlayerPosition } from '../../utils/constants';
 
 interface PlayerFormProps {
   initialData?: PlayerResponse;
-  teams: { id: number; name: string }[];
   onSubmit: (data: PlayerRequest) => void;
   onCancel: () => void;
 }
 
-export default function PlayerForm({ initialData, teams, onSubmit, onCancel }: PlayerFormProps) {
+interface FormErrors {
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  number?: string;
+  position?: string;
+  teamId?: string;
+}
+
+export default function PlayerForm({ initialData, onSubmit, onCancel }: PlayerFormProps) {
   const [form, setForm] = useState<PlayerRequest>({
     firstName: initialData?.firstName || '',
     lastName: initialData?.lastName || '',
     birthDate: initialData?.birthDate?.split('T')[0] || '',
     number: initialData?.number || 1,
     position: initialData?.position ?? PlayerPosition.Forward,
-    teamId: initialData?.teamId || (teams.length > 0 ? teams[0].id : 0),
+    teamId: initialData?.teamId || 0,
   });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [teams, setTeams] = useState<TeamResponse[]>([]);
+
+  useEffect(() => {
+    teamApi.getAll({ pageSize: 100 }).then((r) => setTeams(r.data.items));
+  }, []);
+
+  const validate = (): boolean => {
+    const e: FormErrors = {};
+    if (!form.firstName.trim()) e.firstName = 'El nombre es obligatorio';
+    if (!form.lastName.trim()) e.lastName = 'El apellido es obligatorio';
+    if (!form.birthDate) e.birthDate = 'La fecha es obligatoria';
+    else if (new Date(form.birthDate) >= new Date()) e.birthDate = 'La fecha debe ser en el pasado';
+    if (form.number < 1 || form.number > 99) e.number = 'Numero entre 1 y 99';
+    if (!form.teamId) e.teamId = 'Seleccione un equipo';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(form);
+    if (validate()) onSubmit(form);
   };
 
   return (
     <form onSubmit={handleSubmit} className="form">
       <div className="form-row">
-        <div className="form-group">
-          <label>Nombre *</label>
-          <input
-            type="text"
-            value={form.firstName}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-            required
-            maxLength={80}
-          />
-        </div>
-        <div className="form-group">
-          <label>Apellido *</label>
-          <input
-            type="text"
-            value={form.lastName}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-            required
-            maxLength={80}
-          />
-        </div>
+        <FormField label="Nombre" required error={errors.firstName}>
+          <input type="text" value={form.firstName} maxLength={80} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+        </FormField>
+        <FormField label="Apellido" required error={errors.lastName}>
+          <input type="text" value={form.lastName} maxLength={80} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+        </FormField>
       </div>
+      <FormField label="Fecha Nacimiento" required error={errors.birthDate}>
+        <input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
+      </FormField>
       <div className="form-row">
-        <div className="form-group">
-          <label>Fecha Nacimiento *</label>
-          <input
-            type="date"
-            value={form.birthDate}
-            onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label>Numero *</label>
-          <input
-            type="number"
-            value={form.number}
-            onChange={(e) => setForm({ ...form, number: parseInt(e.target.value) || 1 })}
-            min={1}
-            max={99}
-            required
-          />
-        </div>
-      </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label>Posicion *</label>
-          <select
-            value={form.position}
-            onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) as PlayerPosition })}
-          >
+        <FormField label="Numero" required error={errors.number}>
+          <input type="number" min={1} max={99} value={form.number} onChange={(e) => setForm({ ...form, number: parseInt(e.target.value) || 1 })} />
+        </FormField>
+        <FormField label="Posicion" required>
+          <select value={form.position} onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) as PlayerPosition })}>
             <option value={PlayerPosition.Goalkeeper}>Portero</option>
             <option value={PlayerPosition.Defender}>Defensa</option>
             <option value={PlayerPosition.Midfielder}>Mediocampista</option>
             <option value={PlayerPosition.Forward}>Delantero</option>
           </select>
-        </div>
-        <div className="form-group">
-          <label>Equipo *</label>
-          <select
-            value={form.teamId}
-            onChange={(e) => setForm({ ...form, teamId: parseInt(e.target.value) })}
-          >
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        </FormField>
       </div>
+      <FormField label="Equipo" required error={errors.teamId}>
+        <select value={form.teamId || ''} onChange={(e) => setForm({ ...form, teamId: parseInt(e.target.value) })}>
+          <option value="">Seleccionar equipo...</option>
+          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </FormField>
       <div className="form-actions">
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
-          Cancelar
-        </button>
-        <button type="submit" className="btn btn-primary">
-          {initialData ? 'Actualizar' : 'Crear'}
-        </button>
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
+        <button type="submit" className="btn btn-primary">{initialData ? 'Actualizar' : 'Crear'}</button>
       </div>
     </form>
   );

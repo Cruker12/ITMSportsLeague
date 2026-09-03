@@ -17,7 +17,3 @@ export const formatDateTime = (dateString: string): string => {
     minute: '2-digit',
   });
 };
-
-export const formatNumber = (num: number): string => {
-  return num.toLocaleString('es-CO');
-};

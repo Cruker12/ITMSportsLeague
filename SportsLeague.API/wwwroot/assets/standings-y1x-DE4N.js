@@ -1,0 +1,1 @@
+import{t as e}from"./client-GZv8jg-8.js";var t={getStandings:t=>e.get(`/standings`,{params:{tournamentId:t}}),getTopScorers:t=>e.get(`/stats/scorers`,{params:{tournamentId:t}}),getCardStats:t=>e.get(`/stats/cards`,{params:{tournamentId:t}})};export{t};
